@@ -164,17 +164,17 @@ namespace LibGit2Sharp.Tests
                     }
                 };
 
-                MergeResult mergeResult = repo.Network.Pull(Constants.Signature, pullOptions);
+                MergeResult mergeResult = Commands.Pull(repo, Constants.Signature, pullOptions);
 
                 if(fastForwardStrategy == FastForwardStrategy.Default || fastForwardStrategy == FastForwardStrategy.FastForwardOnly)
                 {
-                    Assert.Equal(mergeResult.Status, MergeStatus.FastForward);
+                    Assert.Equal(MergeStatus.FastForward, mergeResult.Status);
                     Assert.Equal(mergeResult.Commit, repo.Branches["refs/remotes/origin/master"].Tip);
                     Assert.Equal(repo.Head.Tip, repo.Branches["refs/remotes/origin/master"].Tip);
                 }
                 else
                 {
-                    Assert.Equal(mergeResult.Status, MergeStatus.NonFastForward);
+                    Assert.Equal(MergeStatus.NonFastForward, mergeResult.Status);
                 }
             }
         }
@@ -189,7 +189,7 @@ namespace LibGit2Sharp.Tests
             using (var repo = new Repository(repoPath))
             {
                 // Set up remote
-                Remote remote = repo.Network.Remotes.Add(remoteName, url);
+                repo.Network.Remotes.Add(remoteName, url);
 
                 // Set up tracking information
                 repo.Branches.Update(repo.Head,
@@ -197,9 +197,9 @@ namespace LibGit2Sharp.Tests
                     b => b.UpstreamBranch = "refs/heads/master");
 
                 // Pull!
-                MergeResult mergeResult = repo.Network.Pull(Constants.Signature, new PullOptions());
+                MergeResult mergeResult = Commands.Pull(repo, Constants.Signature, new PullOptions());
 
-                Assert.Equal(mergeResult.Status, MergeStatus.FastForward);
+                Assert.Equal(MergeStatus.FastForward, mergeResult.Status);
                 Assert.Equal(mergeResult.Commit, repo.Branches["refs/remotes/origin/master"].Tip);
                 Assert.Equal(repo.Head.Tip, repo.Branches["refs/remotes/origin/master"].Tip);
             }
@@ -224,7 +224,7 @@ namespace LibGit2Sharp.Tests
 
                 try
                 {
-                    repo.Network.Pull(Constants.Signature, new PullOptions());
+                    Commands.Pull(repo, Constants.Signature, new PullOptions());
                 }
                 catch(MergeFetchHeadNotFoundException ex)
                 {
@@ -252,7 +252,7 @@ namespace LibGit2Sharp.Tests
                 Assert.False(repo.RetrieveStatus().Any());
                 Assert.Equal(repo.Lookup<Commit>("refs/remotes/origin/master~1"), repo.Head.Tip);
 
-                repo.Network.Fetch(repo.Head.Remote);
+                Commands.Fetch(repo, repo.Head.RemoteName, new string[0], null, null);
 
                 MergeOptions mergeOptions = new MergeOptions()
                 {
@@ -260,7 +260,41 @@ namespace LibGit2Sharp.Tests
                 };
 
                 MergeResult mergeResult = repo.MergeFetchedRefs(Constants.Signature, mergeOptions);
-                Assert.Equal(mergeResult.Status, MergeStatus.NonFastForward);
+                Assert.Equal(MergeStatus.NonFastForward, mergeResult.Status);
+            }
+        }
+
+        [Fact]
+        public void CanPruneRefs()
+        {
+            string url = "https://github.com/libgit2/TestGitRepository";
+
+            var scd = BuildSelfCleaningDirectory();
+            string clonedRepoPath = Repository.Clone(url, scd.DirectoryPath);
+
+            var scd2 = BuildSelfCleaningDirectory();
+            string clonedRepoPath2 = Repository.Clone(url, scd2.DirectoryPath);
+
+
+            using (var repo = new Repository(clonedRepoPath))
+            {
+                repo.Network.Remotes.Add("pruner", clonedRepoPath2);
+                Commands.Fetch(repo, "pruner", new string[0], null, null);
+                Assert.NotNull(repo.Refs["refs/remotes/pruner/master"]);
+
+                // Remove the branch from the source repository
+                using (var repo2 = new Repository(clonedRepoPath2))
+                {
+                    repo2.Refs.Remove("refs/heads/master");
+                }
+
+                // and by default we don't prune it
+                Commands.Fetch(repo, "pruner", new string[0], null, null);
+                Assert.NotNull(repo.Refs["refs/remotes/pruner/master"]);
+
+                // but we do when asked by the user
+                Commands.Fetch(repo, "pruner", new string[0], new FetchOptions { Prune = true}, null);
+                Assert.Null(repo.Refs["refs/remotes/pruner/master"]);
             }
         }
     }

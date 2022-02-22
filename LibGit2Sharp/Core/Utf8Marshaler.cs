@@ -19,7 +19,7 @@ namespace LibGit2Sharp.Core
     {
         private static readonly LaxUtf8NoCleanupMarshaler staticInstance = new LaxUtf8NoCleanupMarshaler();
 
-        public new static ICustomMarshaler GetInstance(String cookie)
+        public new static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -42,7 +42,7 @@ namespace LibGit2Sharp.Core
     /// Use this marshaler for function parameters, for example:
     /// [DllImport(libgit2)]
     /// internal static extern int git_tag_delete(RepositorySafeHandle repo,
-    ///     [MarshalAs(UnmanagedType.CustomMarshaler,
+    ///     [MarshalAs(UnmanagedType.CustomMarshaler
     ///                MarshalCookie = UniqueId.UniqueIdentifier,
     ///                MarshalTypeRef = typeof(StrictUtf8Marshaler))] String tagName);
     /// </summary>
@@ -60,7 +60,7 @@ namespace LibGit2Sharp.Core
         public StrictUtf8Marshaler() : base(encoding)
         { }
 
-        public static ICustomMarshaler GetInstance(String cookie)
+        public static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -96,7 +96,7 @@ namespace LibGit2Sharp.Core
         public LaxUtf8Marshaler() : base(Encoding)
         { }
 
-        public static ICustomMarshaler GetInstance(String cookie)
+        public static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -111,6 +111,11 @@ namespace LibGit2Sharp.Core
         }
 
         #endregion
+
+        public static unsafe string FromNative(char* pNativeData)
+        {
+            return FromNative(Encoding, (byte*)pNativeData);
+        }
 
         public static string FromNative(IntPtr pNativeData)
         {

@@ -30,5 +30,12 @@ namespace LibGit2Sharp.Core
         Filter,
         Revert,
         Callback,
+        CherryPick,
+        Describe,
+        Rebase,
+        Filesystem,
+        Patch,
+        Worktree,
+        Sha1
     }
 }

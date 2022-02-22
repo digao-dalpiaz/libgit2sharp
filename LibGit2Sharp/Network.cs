@@ -115,9 +115,10 @@ namespace LibGit2Sharp
 
         private IEnumerable<Reference> ListReferencesInternal(string url, CredentialsHandler credentialsProvider)
         {
-            using (RemoteSafeHandle remoteHandle = BuildRemoteSafeHandle(repository.Handle, url))
+            using (RemoteHandle remoteHandle = BuildRemoteHandle(repository.Handle, url))
             {
                 GitRemoteCallbacks gitCallbacks = new GitRemoteCallbacks { version = 1 };
+                GitProxyOptions proxyOptions = new GitProxyOptions { Version = 1 };
 
                 if (credentialsProvider != null)
                 {
@@ -125,177 +126,20 @@ namespace LibGit2Sharp
                     gitCallbacks = callbacks.GenerateCallbacks();
                 }
 
-                Proxy.git_remote_connect(remoteHandle, GitDirection.Fetch, ref gitCallbacks);
+                Proxy.git_remote_connect(remoteHandle, GitDirection.Fetch, ref gitCallbacks, ref proxyOptions);
                 return Proxy.git_remote_ls(repository, remoteHandle);
             }
         }
 
-        static RemoteSafeHandle BuildRemoteSafeHandle(RepositorySafeHandle repoHandle, Remote remote)
+        static RemoteHandle BuildRemoteHandle(RepositoryHandle repoHandle, string url)
         {
-            Debug.Assert(repoHandle != null && !repoHandle.IsClosed && !repoHandle.IsInvalid);
-            Debug.Assert(remote != null && remote.Name != null);
-
-            RemoteSafeHandle remoteHandle = Proxy.git_remote_lookup(repoHandle, remote.Name, true);
-            Debug.Assert(remoteHandle != null && !(remoteHandle.IsClosed || remoteHandle.IsInvalid));
-
-            return remoteHandle;
-        }
-
-        static RemoteSafeHandle BuildRemoteSafeHandle(RepositorySafeHandle repoHandle, string url)
-        {
-            Debug.Assert(repoHandle != null && !repoHandle.IsClosed && !repoHandle.IsInvalid);
+            Debug.Assert(repoHandle != null && !repoHandle.IsNull);
             Debug.Assert(url != null);
 
-            RemoteSafeHandle remoteHandle = Proxy.git_remote_create_anonymous(repoHandle, url);
-            Debug.Assert(remoteHandle != null && !(remoteHandle.IsClosed || remoteHandle.IsInvalid));
+            RemoteHandle remoteHandle = Proxy.git_remote_create_anonymous(repoHandle, url);
+            Debug.Assert(remoteHandle != null && !(remoteHandle.IsNull));
 
             return remoteHandle;
-        }
-
-        static void DoFetch(
-            RepositorySafeHandle repoHandle,
-            Remote remote,
-            FetchOptions options,
-            string logMessage,
-            IEnumerable<string> refspecs)
-        {
-            using (RemoteSafeHandle remoteHandle = BuildRemoteSafeHandle(repoHandle, remote))
-            {
-                DoFetch(options, remoteHandle, logMessage, refspecs);
-            }
-        }
-
-        static void DoFetch(
-            RepositorySafeHandle repoHandle,
-            string url,
-            FetchOptions options,
-            string logMessage,
-            IEnumerable<string> refspecs)
-        {
-            using (RemoteSafeHandle remoteHandle = BuildRemoteSafeHandle(repoHandle, url))
-            {
-                DoFetch(options, remoteHandle, logMessage, refspecs);
-            }
-        }
-
-        private static void DoFetch(FetchOptions options, RemoteSafeHandle remoteHandle, string logMessage, IEnumerable<string> refspecs)
-        {
-            Debug.Assert(remoteHandle != null && !remoteHandle.IsClosed && !remoteHandle.IsInvalid);
-
-            options = options ?? new FetchOptions();
-
-            var callbacks = new RemoteCallbacks(options);
-            GitRemoteCallbacks gitCallbacks = callbacks.GenerateCallbacks();
-
-            // It is OK to pass the reference to the GitCallbacks directly here because libgit2 makes a copy of
-            // the data in the git_remote_callbacks structure. If, in the future, libgit2 changes its implementation
-            // to store a reference to the git_remote_callbacks structure this would introduce a subtle bug
-            // where the managed layer could move the git_remote_callbacks to a different location in memory,
-            // but libgit2 would still reference the old address.
-            //
-            // Also, if GitRemoteCallbacks were a class instead of a struct, we would need to guard against
-            // GC occuring in between setting the remote callbacks and actual usage in one of the functions afterwords.
-            var fetchOptions = new GitFetchOptions
-            {
-                RemoteCallbacks = gitCallbacks,
-                download_tags = Proxy.git_remote_autotag(remoteHandle),
-            };
-
-            if (options.TagFetchMode.HasValue)
-            {
-                fetchOptions.download_tags = options.TagFetchMode.Value;
-            }
-
-            Proxy.git_remote_fetch(remoteHandle, refspecs, fetchOptions, logMessage);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        public virtual void Fetch(Remote remote)
-        {
-            Fetch(remote, (FetchOptions)null, null);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="options"><see cref="FetchOptions"/> controlling fetch behavior</param>
-        public virtual void Fetch(Remote remote, FetchOptions options)
-        {
-            Fetch(remote, options, null);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="logMessage">Message to use when updating the reflog.</param>
-        public virtual void Fetch(Remote remote, string logMessage)
-        {
-            Fetch(remote, (FetchOptions)null, logMessage);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="options"><see cref="FetchOptions"/> controlling fetch behavior</param>
-        /// <param name="logMessage">Message to use when updating the reflog.</param>
-        public virtual void Fetch(Remote remote, FetchOptions options, string logMessage)
-        {
-            Ensure.ArgumentNotNull(remote, "remote");
-
-            DoFetch(repository.Handle, remote, options, logMessage, new string[0]);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>, using custom refspecs.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="refspecs">Refspecs to use, replacing the remote's fetch refspecs</param>
-        public virtual void Fetch(Remote remote, IEnumerable<string> refspecs)
-        {
-            Fetch(remote, refspecs, null, null);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>, using custom refspecs.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="refspecs">Refspecs to use, replacing the remote's fetch refspecs</param>
-        /// <param name="options"><see cref="FetchOptions"/> controlling fetch behavior</param>
-        public virtual void Fetch(Remote remote, IEnumerable<string> refspecs, FetchOptions options)
-        {
-            Fetch(remote, refspecs, options, null);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>, using custom refspecs.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="refspecs">Refspecs to use, replacing the remote's fetch refspecs</param>
-        /// <param name="logMessage">Message to use when updating the reflog.</param>
-        public virtual void Fetch(Remote remote, IEnumerable<string> refspecs, string logMessage)
-        {
-            Fetch(remote, refspecs, null, logMessage);
-        }
-
-        /// <summary>
-        /// Fetch from the <see cref="Remote"/>, using custom refspecs.
-        /// </summary>
-        /// <param name="remote">The remote to fetch</param>
-        /// <param name="refspecs">Refspecs to use, replacing the remote's fetch refspecs</param>
-        /// <param name="options"><see cref="FetchOptions"/> controlling fetch behavior</param>
-        /// <param name="logMessage">Message to use when updating the reflog.</param>
-        public virtual void Fetch(Remote remote, IEnumerable<string> refspecs, FetchOptions options, string logMessage)
-        {
-            Ensure.ArgumentNotNull(remote, "remote");
-            Ensure.ArgumentNotNull(refspecs, "refspecs");
-
-            DoFetch(repository.Handle, remote, options, logMessage, refspecs);
         }
 
         /// <summary>
@@ -346,7 +190,7 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(url, "url");
             Ensure.ArgumentNotNull(refspecs, "refspecs");
 
-            DoFetch(repository.Handle, url, options, logMessage, refspecs);
+            Commands.Fetch(repository, url, refspecs, options, logMessage);
         }
 
         /// <summary>
@@ -399,19 +243,19 @@ namespace LibGit2Sharp
             {
                 if (string.IsNullOrEmpty(branch.UpstreamBranchCanonicalName))
                 {
-                    throw new LibGit2SharpException(
-                        string.Format(
-                            CultureInfo.InvariantCulture,
-                            "The branch '{0}' (\"{1}\") that you are trying to push does not track an upstream branch.",
-                            branch.FriendlyName, branch.CanonicalName));
+                    throw new LibGit2SharpException("The branch '{0}' (\"{1}\") that you are trying to push does not track an upstream branch.",
+                            branch.FriendlyName, branch.CanonicalName);
                 }
             }
 
             foreach (var branch in enumeratedBranches)
             {
-                Push(branch.Remote, string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}:{1}", branch.CanonicalName, branch.UpstreamBranchCanonicalName), pushOptions);
+                using (var remote = repository.Network.Remotes.RemoteForName(branch.RemoteName))
+                {
+                    Push(remote, string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}:{1}", branch.CanonicalName, branch.UpstreamBranchCanonicalName), pushOptions);
+                }
             }
         }
 
@@ -520,7 +364,7 @@ namespace LibGit2Sharp
             }
 
             // Load the remote.
-            using (RemoteSafeHandle remoteHandle = Proxy.git_remote_lookup(repository.Handle, remote.Name, true))
+            using (RemoteHandle remoteHandle = Proxy.git_remote_lookup(repository.Handle, remote.Name, true))
             {
                 var callbacks = new RemoteCallbacks(pushOptions);
                 GitRemoteCallbacks gitCallbacks = callbacks.GenerateCallbacks();
@@ -531,34 +375,9 @@ namespace LibGit2Sharp
                                       {
                                           PackbuilderDegreeOfParallelism = pushOptions.PackbuilderDegreeOfParallelism,
                                           RemoteCallbacks = gitCallbacks,
+                                          ProxyOptions = new GitProxyOptions { Version = 1 },
                                       });
             }
-        }
-
-        /// <summary>
-        /// Pull changes from the configured upstream remote and branch into the branch pointed at by HEAD.
-        /// </summary>
-        /// <param name="merger">If the merge is a non-fast forward merge that generates a merge commit, the <see cref="Signature"/> of who made the merge.</param>
-        /// <param name="options">Specifies optional parameters controlling merge behavior of pull; if null, the defaults are used.</param>
-        public virtual MergeResult Pull(Signature merger, PullOptions options)
-        {
-            Ensure.ArgumentNotNull(merger, "merger");
-            Ensure.ArgumentNotNull(options, "options");
-
-            Branch currentBranch = repository.Head;
-
-            if (!currentBranch.IsTracking)
-            {
-                throw new LibGit2SharpException("There is no tracking information for the current branch.");
-            }
-
-            if (currentBranch.Remote == null)
-            {
-                throw new LibGit2SharpException("No upstream remote for the current branch.");
-            }
-
-            Fetch(currentBranch.Remote, options.FetchOptions);
-            return repository.MergeFetchedRefs(merger, options.MergeOptions);
         }
 
         /// <summary>

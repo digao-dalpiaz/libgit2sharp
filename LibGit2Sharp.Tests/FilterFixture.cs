@@ -4,6 +4,7 @@ using System.Linq;
 using System.IO;
 using LibGit2Sharp.Tests.TestHelpers;
 using Xunit;
+using System.Threading.Tasks;
 
 namespace LibGit2Sharp.Tests
 {
@@ -173,6 +174,49 @@ namespace LibGit2Sharp.Tests
         }
 
         [Fact]
+        public void CanHandleMultipleSmudgesConcurrently()
+        {
+            const string decodedInput = "This is a substitution cipher";
+            const string encodedInput = "Guvf vf n fhofgvghgvba pvcure";
+
+            const string branchName = "branch";
+
+            Action<Stream, Stream> smudgeCallback = SubstitutionCipherFilter.RotateByThirteenPlaces;
+
+            var filter = new FakeFilter(FilterName, attributes, null, smudgeCallback);
+            var registration = GlobalSettings.RegisterFilter(filter);
+
+            try
+            {
+                int count = 30;
+                var tasks = new Task<FileInfo>[count];
+
+                for (int i = 0; i < count; i++)
+                {
+                    tasks[i] = Task.Factory.StartNew(() =>
+                    {
+                        string repoPath = InitNewRepository();
+                        return CheckoutFileForSmudge(repoPath, branchName, encodedInput);
+                    });
+                }
+
+                Task.WaitAll(tasks);
+
+                foreach(var task in tasks)
+                {
+                    FileInfo expectedFile = task.Result;
+
+                    string readAllText = File.ReadAllText(expectedFile.FullName);
+                    Assert.Equal(decodedInput, readAllText);
+                }
+            }
+            finally
+            {
+                GlobalSettings.DeregisterFilter(registration);
+            }
+        }
+
+        [Fact]
         public void WhenCheckingOutAFileFileSmudgeWritesCorrectFileToWorkingDirectory()
         {
             const string decodedInput = "This is a substitution cipher";
@@ -232,17 +276,15 @@ namespace LibGit2Sharp.Tests
                 string attributesPath = Path.Combine(Directory.GetParent(repoPath).Parent.FullName, ".gitattributes");
                 FileInfo attributesFile = new FileInfo(attributesPath);
 
-                string configPath = CreateConfigurationWithDummyUser(Constants.Identity);
-                var repositoryOptions = new RepositoryOptions { GlobalConfigurationLocation = configPath };
-
-                using (Repository repo = new Repository(repoPath, repositoryOptions))
+                using (Repository repo = new Repository(repoPath))
                 {
+                    CreateConfigurationWithDummyUser(repo, Constants.Identity);
                     File.WriteAllText(attributesPath, "*.blob filter=test");
-                    repo.Stage(attributesFile.Name);
-                    repo.Stage(contentFile.Name);
+                    Commands.Stage(repo, attributesFile.Name);
+                    Commands.Stage(repo, contentFile.Name);
                     repo.Commit("test", Constants.Signature, Constants.Signature);
                     contentFile.Delete();
-                    repo.Checkout("HEAD", new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force });
+                    Commands.Checkout(repo, "HEAD", new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force });
                 }
 
                 contentFile = new FileInfo(filePath);
@@ -272,23 +314,23 @@ namespace LibGit2Sharp.Tests
         [Fact]
         public void DoubleRegistrationFailsButDoubleDeregistrationDoesNot()
         {
-            Assert.Equal(0, GlobalSettings.GetRegisteredFilters().Count());
+            Assert.Empty(GlobalSettings.GetRegisteredFilters());
 
             var filter = new EmptyFilter(FilterName, attributes);
             var registration = GlobalSettings.RegisterFilter(filter);
 
             Assert.Throws<EntryExistsException>(() => { GlobalSettings.RegisterFilter(filter); });
-            Assert.Equal(1, GlobalSettings.GetRegisteredFilters().Count());
+            Assert.Single(GlobalSettings.GetRegisteredFilters());
 
             Assert.True(registration.IsValid, "FilterRegistration.IsValid should be true.");
 
             GlobalSettings.DeregisterFilter(registration);
-            Assert.Equal(0, GlobalSettings.GetRegisteredFilters().Count());
+            Assert.Empty(GlobalSettings.GetRegisteredFilters());
 
             Assert.False(registration.IsValid, "FilterRegistration.IsValid should be false.");
 
             GlobalSettings.DeregisterFilter(registration);
-            Assert.Equal(0, GlobalSettings.GetRegisteredFilters().Count());
+            Assert.Empty(GlobalSettings.GetRegisteredFilters());
 
             Assert.False(registration.IsValid, "FilterRegistration.IsValid should be false.");
         }
@@ -350,9 +392,9 @@ namespace LibGit2Sharp.Tests
 
                 expectedPath = CommitFileOnBranch(repo, branchName, content);
 
-                repo.Checkout("master");
+                Commands.Checkout(repo, "master");
 
-                repo.Checkout(branchName);
+                Commands.Checkout(repo, branchName);
             }
             return expectedPath;
         }
@@ -360,7 +402,7 @@ namespace LibGit2Sharp.Tests
         private static FileInfo CommitFileOnBranch(Repository repo, string branchName, String content)
         {
             var branch = repo.CreateBranch(branchName);
-            repo.Checkout(branch.FriendlyName);
+            Commands.Checkout(repo, branch.FriendlyName);
 
             FileInfo expectedPath = StageNewFile(repo, content);
             repo.Commit("Commit", Constants.Signature, Constants.Signature);
@@ -371,15 +413,14 @@ namespace LibGit2Sharp.Tests
         {
             string newFilePath = Touch(repo.Info.WorkingDirectory, Guid.NewGuid() + ".txt", contents);
             var stageNewFile = new FileInfo(newFilePath);
-            repo.Stage(newFilePath);
+            Commands.Stage(repo, newFilePath);
             return stageNewFile;
         }
 
         private Repository CreateTestRepository(string path)
         {
-            string configPath = CreateConfigurationWithDummyUser(Constants.Identity);
-            var repositoryOptions = new RepositoryOptions { GlobalConfigurationLocation = configPath };
-            var repository = new Repository(path, repositoryOptions);
+            var repository = new Repository(path);
+            CreateConfigurationWithDummyUser(repository, Constants.Identity);
             CreateAttributesFile(repository, "* filter=test");
             return repository;
         }

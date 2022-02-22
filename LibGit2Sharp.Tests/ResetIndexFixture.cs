@@ -62,7 +62,7 @@ namespace LibGit2Sharp.Tests
                 repo.Index.Replace(repo.Head.Tip);
 
                 RepositoryStatus newStatus = repo.RetrieveStatus();
-                Assert.Equal(0, newStatus.Where(IsStaged).Count());
+                Assert.Empty(newStatus.Where(IsStaged));
 
                 // Assert that no reflog entry is created
                 Assert.Equal(reflogEntriesCount, repo.Refs.Log(repo.Refs.Head).Count());
@@ -79,7 +79,7 @@ namespace LibGit2Sharp.Tests
 
                 RepositoryStatus newStatus = repo.RetrieveStatus();
 
-                var expected = new[] { "1.txt", Path.Combine("1", "branch_file.txt"), "deleted_staged_file.txt",
+                var expected = new[] { "1.txt", string.Join("/", "1", "branch_file.txt"), "deleted_staged_file.txt",
                     "deleted_unstaged_file.txt", "modified_staged_file.txt", "modified_unstaged_file.txt" };
 
                 Assert.Equal(expected.Length, newStatus.Where(IsStaged).Count());
@@ -116,11 +116,11 @@ namespace LibGit2Sharp.Tests
         {
             using (var repo = new Repository(SandboxStandardTestRepo()))
             {
-                repo.Move("branch_file.txt", "renamed_branch_file.txt");
+                Commands.Move(repo, "branch_file.txt", "renamed_branch_file.txt");
                 repo.Index.Replace(repo.Lookup<Commit>("32eab9c"));
 
                 RepositoryStatus status = repo.RetrieveStatus();
-                Assert.Equal(0, status.Where(IsStaged).Count());
+                Assert.Empty(status.Where(IsStaged));
             }
         }
 
@@ -129,17 +129,17 @@ namespace LibGit2Sharp.Tests
         {
             using (var repo = new Repository(SandboxStandardTestRepo()))
             {
-                repo.Move("branch_file.txt", "renamed_branch_file.txt");
+                Commands.Move(repo, "branch_file.txt", "renamed_branch_file.txt");
 
                 RepositoryStatus oldStatus = repo.RetrieveStatus();
-                Assert.Equal(1, oldStatus.RenamedInIndex.Count());
+                Assert.Single(oldStatus.RenamedInIndex);
                 Assert.Equal(FileStatus.Nonexistent, oldStatus["branch_file.txt"].State);
                 Assert.Equal(FileStatus.RenamedInIndex, oldStatus["renamed_branch_file.txt"].State);
 
                 repo.Index.Replace(repo.Lookup<Commit>("32eab9c"), new string[] { "branch_file.txt" });
 
                 RepositoryStatus newStatus = repo.RetrieveStatus();
-                Assert.Equal(0, newStatus.RenamedInIndex.Count());
+                Assert.Empty(newStatus.RenamedInIndex);
                 Assert.Equal(FileStatus.DeletedFromWorkdir, newStatus["branch_file.txt"].State);
                 Assert.Equal(FileStatus.NewInIndex, newStatus["renamed_branch_file.txt"].State);
             }
@@ -150,16 +150,16 @@ namespace LibGit2Sharp.Tests
         {
             using (var repo = new Repository(SandboxStandardTestRepo()))
             {
-                repo.Move("branch_file.txt", "renamed_branch_file.txt");
+                Commands.Move(repo, "branch_file.txt", "renamed_branch_file.txt");
 
                 RepositoryStatus oldStatus = repo.RetrieveStatus();
-                Assert.Equal(1, oldStatus.RenamedInIndex.Count());
+                Assert.Single(oldStatus.RenamedInIndex);
                 Assert.Equal(FileStatus.RenamedInIndex, oldStatus["renamed_branch_file.txt"].State);
 
                 repo.Index.Replace(repo.Lookup<Commit>("32eab9c"), new string[] { "renamed_branch_file.txt" });
 
                 RepositoryStatus newStatus = repo.RetrieveStatus();
-                Assert.Equal(0, newStatus.RenamedInIndex.Count());
+                Assert.Empty(newStatus.RenamedInIndex);
                 Assert.Equal(FileStatus.NewInWorkdir, newStatus["renamed_branch_file.txt"].State);
                 Assert.Equal(FileStatus.DeletedFromIndex, newStatus["branch_file.txt"].State);
             }

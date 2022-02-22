@@ -102,7 +102,7 @@ namespace LibGit2Sharp.Tests
                 Branch branch = repo.Branches["mybranch"];
 
                 string branchIdentifier = branchIdentifierRetriever(branch);
-                repo.Checkout(branchIdentifier);
+                Commands.Checkout(repo, branchIdentifier);
                 var oldHeadId = repo.Head.Tip.Id;
                 Assert.Equal(shouldHeadBeDetached, repo.Info.IsHeadDetached);
 
@@ -163,18 +163,18 @@ namespace LibGit2Sharp.Tests
         private static void FeedTheRepository(IRepository repo)
         {
             string fullPath = Touch(repo.Info.WorkingDirectory, "a.txt", "Hello\n");
-            repo.Stage(fullPath);
+            Commands.Stage(repo, fullPath);
             repo.Commit("Initial commit", Constants.Signature, Constants.Signature);
             repo.ApplyTag("mytag");
 
             File.AppendAllText(fullPath, "World\n");
-            repo.Stage(fullPath);
+            Commands.Stage(repo, fullPath);
 
             Signature shiftedSignature = Constants.Signature.TimeShift(TimeSpan.FromMinutes(1));
             repo.Commit("Update file", shiftedSignature, shiftedSignature);
             repo.CreateBranch("mybranch");
 
-            repo.Checkout("mybranch");
+            Commands.Checkout(repo, "mybranch");
 
             Assert.False(repo.RetrieveStatus().IsDirty);
         }
@@ -235,6 +235,8 @@ namespace LibGit2Sharp.Tests
         [Fact]
         public void HardResetUpdatesTheContentOfTheWorkingDirectory()
         {
+            bool progressCalled = false;
+
             string path = SandboxStandardTestRepo();
             using (var repo = new Repository(path))
             {
@@ -245,11 +247,16 @@ namespace LibGit2Sharp.Tests
 
                 Assert.True(names.Count > 4);
 
-                repo.Reset(ResetMode.Hard, "HEAD~3");
+                var commit = repo.Lookup<Commit>("HEAD~3");
+                repo.Reset(ResetMode.Hard, commit, new CheckoutOptions()
+                {
+                    OnCheckoutProgress = (_path, _completed, _total) => { progressCalled = true; },
+                });
 
                 names = new DirectoryInfo(repo.Info.WorkingDirectory).GetFileSystemInfos().Select(fsi => fsi.Name).ToList();
                 names.Sort(StringComparer.Ordinal);
 
+                Assert.True(progressCalled);
                 Assert.Equal(new[] { ".git", "README", "WillNotBeRemoved.txt", "branch_file.txt", "new.txt", "new_untracked_file.txt" }, names);
             }
         }

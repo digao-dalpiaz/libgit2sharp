@@ -16,15 +16,15 @@ namespace LibGit2Sharp.Tests
             {
                 Touch(repo.Info.WorkingDirectory, "Foo.cs", "Bar");
 
-                Assert.True(repo.RetrieveStatus().Untracked.Select(s => s.FilePath).Contains("Foo.cs"));
+                Assert.Contains("Foo.cs", repo.RetrieveStatus().Untracked.Select(s => s.FilePath));
 
                 repo.Ignore.AddTemporaryRules(new[] { "*.cs" });
 
-                Assert.False(repo.RetrieveStatus().Untracked.Select(s => s.FilePath).Contains("Foo.cs"));
+                Assert.DoesNotContain("Foo.cs", repo.RetrieveStatus().Untracked.Select(s => s.FilePath));
 
                 repo.Ignore.ResetAllTemporaryRules();
 
-                Assert.True(repo.RetrieveStatus().Untracked.Select(s => s.FilePath).Contains("Foo.cs"));
+                Assert.Contains("Foo.cs", repo.RetrieveStatus().Untracked.Select(s => s.FilePath));
             }
         }
 
@@ -79,8 +79,8 @@ namespace LibGit2Sharp.Tests
 
                 Assert.False(repo.Ignore.IsPathIgnored("File.txt"));
                 Assert.True(repo.Ignore.IsPathIgnored("NewFolder"));
-                Assert.True(repo.Ignore.IsPathIgnored(string.Format(@"NewFolder{0}NewFolder", Path.DirectorySeparatorChar)));
-                Assert.True(repo.Ignore.IsPathIgnored(string.Format(@"NewFolder{0}NewFolder{0}File.txt", Path.DirectorySeparatorChar)));
+                Assert.True(repo.Ignore.IsPathIgnored(string.Join("/", "NewFolder", "NewFolder")));
+                Assert.True(repo.Ignore.IsPathIgnored(string.Join("/", "NewFolder", "NewFolder", "File.txt")));
             }
         }
 
@@ -90,24 +90,22 @@ namespace LibGit2Sharp.Tests
             string path = InitNewRepository();
             using (var repo = new Repository(path))
             {
-                char pd = Path.DirectorySeparatorChar;
-
-                var gitIgnoreFile = string.Format("deeply{0}nested{0}.gitignore", pd);
+                var gitIgnoreFile = string.Join("/", "deeply", "nested", ".gitignore");
                 Touch(repo.Info.WorkingDirectory, gitIgnoreFile, "SmtCounters.h");
 
-                repo.Stage(gitIgnoreFile);
+                Commands.Stage(repo, gitIgnoreFile);
                 repo.Commit("Add .gitignore", Constants.Signature, Constants.Signature);
 
                 Assert.False(repo.RetrieveStatus().IsDirty);
 
-                var ignoredFile = string.Format("deeply{0}nested{0}SmtCounters.h", pd);
+                var ignoredFile = string.Join("/", "deeply", "nested", "SmtCounters.h");
                 Touch(repo.Info.WorkingDirectory, ignoredFile, "Content");
                 Assert.False(repo.RetrieveStatus().IsDirty);
 
-                var file = string.Format("deeply{0}nested{0}file.txt", pd);
+                var file = string.Join("/", "deeply", "nested", "file.txt");
                 Touch(repo.Info.WorkingDirectory, file, "Yeah!");
 
-                var repositoryStatus = repo.RetrieveStatus();
+                var repositoryStatus = repo.RetrieveStatus(new StatusOptions { IncludeIgnored = true });
                 Assert.True(repositoryStatus.IsDirty);
 
                 Assert.Equal(FileStatus.Ignored, repositoryStatus[ignoredFile].State);

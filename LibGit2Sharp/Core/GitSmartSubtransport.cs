@@ -8,7 +8,7 @@ namespace LibGit2Sharp.Core
     {
         static GitSmartSubtransport()
         {
-            GCHandleOffset = Marshal.OffsetOf(typeof(GitSmartSubtransport), "GCHandle").ToInt32();
+            GCHandleOffset = Marshal.OffsetOf<GitSmartSubtransport>(nameof(GCHandle)).ToInt32();
         }
 
         public action_callback Action;
@@ -23,14 +23,17 @@ namespace LibGit2Sharp.Core
 
         public static int GCHandleOffset;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int action_callback(
             out IntPtr stream,
             IntPtr subtransport,
             IntPtr url,
             GitSmartSubtransportAction action);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int close_callback(IntPtr subtransport);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void free_callback(IntPtr subtransport);
     }
 }

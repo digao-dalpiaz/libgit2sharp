@@ -134,6 +134,13 @@ namespace LibGit2Sharp.Core
          */
 
         /// <summary>
+        /// Use a heuristic that takes indentation and whitespace into account
+        /// which generally can produce better diffs when dealing with ambiguous
+        /// diff hunks.
+        /// </summary>
+        GIT_DIFF_INDENT_HEURISTIC = (1 << 18),
+
+        /// <summary>
         /// Treat all files as text, disabling binary attributes and detection
         /// </summary>
         GIT_DIFF_FORCE_TEXT = (1 << 20),
@@ -191,10 +198,18 @@ namespace LibGit2Sharp.Core
         GIT_DIFF_SHOW_BINARY = (1 << 30),
     }
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     internal delegate int diff_notify_cb(
         IntPtr diff_so_far,
         IntPtr delta_to_add,
         IntPtr matched_pathspec,
+        IntPtr payload);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    internal delegate int diff_progress_cb(
+        IntPtr diff_so_far,
+        IntPtr old_path,
+        IntPtr new_path,
         IntPtr payload);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -208,7 +223,8 @@ namespace LibGit2Sharp.Core
         public SubmoduleIgnore IgnoreSubmodules;
         public GitStrArrayManaged PathSpec;
         public diff_notify_cb NotifyCallback;
-        public IntPtr NotifyPayload;
+        public diff_progress_cb ProgressCallback;
+        public IntPtr Payload;
 
         /* options controlling how to diff text is generated */
 
@@ -235,24 +251,25 @@ namespace LibGit2Sharp.Core
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal class GitDiffFile
+    internal unsafe struct git_diff_file
     {
-        public GitOid Id;
-        public IntPtr Path;
+        public git_oid Id;
+        public char* Path;
         public Int64 Size;
         public GitDiffFlags Flags;
         public UInt16 Mode;
+        public UInt16 IdAbbrev;
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    internal class GitDiffDelta
+    internal unsafe struct git_diff_delta
     {
-        public ChangeKind Status;
-        public GitDiffFlags Flags;
-        public UInt16 Similarity;
-        public UInt16 NumberOfFiles;
-        public GitDiffFile OldFile;
-        public GitDiffFile NewFile;
+        public ChangeKind status;
+        public GitDiffFlags flags;
+        public UInt16 similarity;
+        public UInt16 nfiles;
+        public git_diff_file old_file;
+        public git_diff_file new_file;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -296,11 +313,11 @@ namespace LibGit2Sharp.Core
 
     enum GitDiffFormat
     {
-        GIT_DIFF_FORMAT_PATCH        = 1, // < full git diff
+        GIT_DIFF_FORMAT_PATCH = 1, // < full git diff
         GIT_DIFF_FORMAT_PATCH_HEADER = 2, // < just the file headers of patch
-        GIT_DIFF_FORMAT_RAW          = 3, // < like git diff --raw
-        GIT_DIFF_FORMAT_NAME_ONLY    = 4, // < like git diff --name-only
-        GIT_DIFF_FORMAT_NAME_STATUS  = 5, // < like git diff --name-status
+        GIT_DIFF_FORMAT_RAW = 3, // < like git diff --raw
+        GIT_DIFF_FORMAT_NAME_ONLY = 4, // < like git diff --name-only
+        GIT_DIFF_FORMAT_NAME_STATUS = 5, // < like git diff --name-status
     }
 
     [Flags]
@@ -389,6 +406,7 @@ namespace LibGit2Sharp.Core
     [StructLayout(LayoutKind.Sequential)]
     internal class GitDiffBinary
     {
+        public uint ContainsData;
         public GitDiffBinaryFile OldFile;
         public GitDiffBinaryFile NewFile;
     }

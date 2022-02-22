@@ -19,8 +19,9 @@ namespace LibGit2Sharp
         private readonly FilePath globalConfigPath;
         private readonly FilePath xdgConfigPath;
         private readonly FilePath systemConfigPath;
+        private readonly FilePath programDataConfigPath;
 
-        private ConfigurationSafeHandle configHandle;
+        private ConfigurationHandle configHandle;
 
         /// <summary>
         /// Needed for mocking purposes.
@@ -43,6 +44,7 @@ namespace LibGit2Sharp
             globalConfigPath = globalConfigurationFileLocation ?? Proxy.git_config_find_global();
             xdgConfigPath = xdgConfigurationFileLocation ?? Proxy.git_config_find_xdg();
             systemConfigPath = systemConfigurationFileLocation ?? Proxy.git_config_find_system();
+            programDataConfigPath = Proxy.git_config_find_programdata();
 
             Init(repository);
         }
@@ -50,36 +52,42 @@ namespace LibGit2Sharp
         private void Init(Repository repository)
         {
             configHandle = Proxy.git_config_new();
+            RepositoryHandle repoHandle = (repository != null) ? repository.Handle : null;
 
-            if (repository != null)
+            if (repoHandle != null)
             {
                 //TODO: push back this logic into libgit2.
                 // As stated by @carlosmn "having a helper function to load the defaults and then allowing you
                 // to modify it before giving it to git_repository_open_ext() would be a good addition, I think."
                 //  -- Agreed :)
                 string repoConfigLocation = Path.Combine(repository.Info.Path, "config");
-                Proxy.git_config_add_file_ondisk(configHandle, repoConfigLocation, ConfigurationLevel.Local);
+                Proxy.git_config_add_file_ondisk(configHandle, repoConfigLocation, ConfigurationLevel.Local, repoHandle);
 
-                Proxy.git_repository_set_config(repository.Handle, configHandle);
+                Proxy.git_repository_set_config(repoHandle, configHandle);
             }
             else if (repoConfigPath != null)
             {
-                Proxy.git_config_add_file_ondisk(configHandle, repoConfigPath, ConfigurationLevel.Local);
+                Proxy.git_config_add_file_ondisk(configHandle, repoConfigPath, ConfigurationLevel.Local, repoHandle);
             }
 
             if (globalConfigPath != null)
             {
-                Proxy.git_config_add_file_ondisk(configHandle, globalConfigPath, ConfigurationLevel.Global);
+                Proxy.git_config_add_file_ondisk(configHandle, globalConfigPath, ConfigurationLevel.Global, repoHandle);
             }
 
             if (xdgConfigPath != null)
             {
-                Proxy.git_config_add_file_ondisk(configHandle, xdgConfigPath, ConfigurationLevel.Xdg);
+                Proxy.git_config_add_file_ondisk(configHandle, xdgConfigPath, ConfigurationLevel.Xdg, repoHandle);
             }
 
             if (systemConfigPath != null)
             {
-                Proxy.git_config_add_file_ondisk(configHandle, systemConfigPath, ConfigurationLevel.System);
+                Proxy.git_config_add_file_ondisk(configHandle, systemConfigPath, ConfigurationLevel.System, repoHandle);
+            }
+
+            if (programDataConfigPath != null)
+            {
+                Proxy.git_config_add_file_ondisk(configHandle, programDataConfigPath, ConfigurationLevel.ProgramData, repoHandle);
             }
         }
 
@@ -196,42 +204,12 @@ namespace LibGit2Sharp
         }
 
         /// <summary>
-        /// Access configuration values without a repository. Generally you want to access configuration via an instance of <see cref="Repository"/> instead.
-        /// </summary>
-        /// <param name="globalConfigurationFileLocation">Path to a Global configuration file. If null, the default path for a global configuration file will be probed.</param>
-        [Obsolete("This method will be removed in the next release. Please use Configuration.BuildFrom(string, string) instead.")]
-        public Configuration(string globalConfigurationFileLocation)
-            : this(null, null, globalConfigurationFileLocation, null, null)
-        { }
-
-        /// <summary>
-        /// Access configuration values without a repository. Generally you want to access configuration via an instance of <see cref="Repository"/> instead.
-        /// </summary>
-        /// <param name="globalConfigurationFileLocation">Path to a Global configuration file. If null, the default path for a global configuration file will be probed.</param>
-        /// <param name="xdgConfigurationFileLocation">Path to a XDG configuration file. If null, the default path for a XDG configuration file will be probed.</param>
-        [Obsolete("This method will be removed in the next release. Please use Configuration.BuildFrom(string, string, string) instead.")]
-        public Configuration(string globalConfigurationFileLocation, string xdgConfigurationFileLocation)
-            : this(null, null, globalConfigurationFileLocation, xdgConfigurationFileLocation, null)
-        { }
-
-        /// <summary>
-        /// Access configuration values without a repository. Generally you want to access configuration via an instance of <see cref="Repository"/> instead.
-        /// </summary>
-        /// <param name="globalConfigurationFileLocation">Path to a Global configuration file. If null, the default path for a global configuration file will be probed.</param>
-        /// <param name="xdgConfigurationFileLocation">Path to a XDG configuration file. If null, the default path for a XDG configuration file will be probed.</param>
-        /// <param name="systemConfigurationFileLocation">Path to a System configuration file. If null, the default path for a system configuration file will be probed.</param>
-        [Obsolete("This method will be removed in the next release. Please use Configuration.BuildFrom(string, string, string, string) instead.")]
-        public Configuration(string globalConfigurationFileLocation, string xdgConfigurationFileLocation, string systemConfigurationFileLocation)
-            : this(null, null, globalConfigurationFileLocation, xdgConfigurationFileLocation, systemConfigurationFileLocation)
-        { }
-
-        /// <summary>
         /// Determines which configuration file has been found.
         /// </summary>
         public virtual bool HasConfig(ConfigurationLevel level)
         {
-            using (ConfigurationSafeHandle snapshot = Snapshot())
-            using (ConfigurationSafeHandle handle = RetrieveConfigurationHandle(level, false, snapshot))
+            using (ConfigurationHandle snapshot = Snapshot())
+            using (ConfigurationHandle handle = RetrieveConfigurationHandle(level, false, snapshot))
             {
                 return handle != null;
             }
@@ -255,9 +233,9 @@ namespace LibGit2Sharp
         /// Unset a configuration variable (key and value) in the local configuration.
         /// </summary>
         /// <param name="key">The key to unset.</param>
-        public virtual void Unset(string key)
+        public virtual bool Unset(string key)
         {
-            Unset(key, ConfigurationLevel.Local);
+            return Unset(key, ConfigurationLevel.Local);
         }
 
         /// <summary>
@@ -265,23 +243,37 @@ namespace LibGit2Sharp
         /// </summary>
         /// <param name="key">The key to unset.</param>
         /// <param name="level">The configuration file which should be considered as the target of this operation</param>
-        public virtual void Unset(string key, ConfigurationLevel level)
+        public virtual bool Unset(string key, ConfigurationLevel level)
         {
             Ensure.ArgumentNotNullOrEmptyString(key, "key");
 
-            using (ConfigurationSafeHandle h = RetrieveConfigurationHandle(level, true, configHandle))
+            using (ConfigurationHandle h = RetrieveConfigurationHandle(level, true, configHandle))
             {
-                Proxy.git_config_delete(h, key);
+                return Proxy.git_config_delete(h, key);
             }
         }
 
-        internal void UnsetMultivar(string key, ConfigurationLevel level)
+        /// <summary>
+        /// Unset all configuration values in a multivar variable (key and value) in the local configuration.
+        /// </summary>
+        /// <param name="key">The key to unset.</param>
+        public virtual bool UnsetAll(string key)
+        {
+            return UnsetAll(key, ConfigurationLevel.Local);
+        }
+
+        /// <summary>
+        /// Unset all configuration values in a multivar variable (key and value).
+        /// </summary>
+        /// <param name="key">The key to unset.</param>
+        /// <param name="level">The configuration file which should be considered as the target of this operation</param>
+        public virtual bool UnsetAll(string key, ConfigurationLevel level)
         {
             Ensure.ArgumentNotNullOrEmptyString(key, "key");
 
-            using (ConfigurationSafeHandle h = RetrieveConfigurationHandle(level, true, configHandle))
+            using (ConfigurationHandle h = RetrieveConfigurationHandle(level, true, configHandle))
             {
-                Proxy.git_config_delete_multivar(h, key);
+                return Proxy.git_config_delete_multivar(h, key);
             }
         }
 
@@ -384,7 +376,7 @@ namespace LibGit2Sharp
         {
             Ensure.ArgumentNotNullOrEmptyString(key, "key");
 
-            using (ConfigurationSafeHandle snapshot = Snapshot())
+            using (ConfigurationHandle snapshot = Snapshot())
             {
                 return Proxy.git_config_get_entry<T>(snapshot, key);
             }
@@ -415,8 +407,8 @@ namespace LibGit2Sharp
         {
             Ensure.ArgumentNotNullOrEmptyString(key, "key");
 
-            using (ConfigurationSafeHandle snapshot = Snapshot())
-            using (ConfigurationSafeHandle handle = RetrieveConfigurationHandle(level, false, snapshot))
+            using (ConfigurationHandle snapshot = Snapshot())
+            using (ConfigurationHandle handle = RetrieveConfigurationHandle(level, false, snapshot))
             {
                 if (handle == null)
                 {
@@ -645,7 +637,7 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(value, "value");
             Ensure.ArgumentNotNullOrEmptyString(key, "key");
 
-            using (ConfigurationSafeHandle h = RetrieveConfigurationHandle(level, true, configHandle))
+            using (ConfigurationHandle h = RetrieveConfigurationHandle(level, true, configHandle))
             {
                 if (!configurationTypedUpdater.ContainsKey(typeof(T)))
                 {
@@ -653,6 +645,53 @@ namespace LibGit2Sharp
                 }
 
                 configurationTypedUpdater[typeof(T)](key, value, h);
+            }
+        }
+
+        /// <summary>
+        /// Adds a configuration value for a multivalue key in the local configuration. Keys are in the form 'section.name'.
+        /// <para>
+        ///   For example in order to add the value for this in a .git\config file:
+        ///
+        ///   [test]
+        ///   plugin = first
+        ///
+        ///   You would call:
+        ///
+        ///   repo.Config.Add("test.plugin", "first");
+        /// </para>
+        /// </summary>
+        /// <param name="key">The key parts</param>
+        /// <param name="value">The value</param>
+        public virtual void Add(string key, string value)
+        {
+            Add(key, value, ConfigurationLevel.Local);
+        }
+
+        /// <summary>
+        /// Adds a configuration value for a multivalue key. Keys are in the form 'section.name'.
+        /// <para>
+        ///   For example in order to add the value for this in a .git\config file:
+        ///
+        ///   [test]
+        ///   plugin = first
+        ///
+        ///   You would call:
+        ///
+        ///   repo.Config.Add("test.plugin", "first");
+        /// </para>
+        /// </summary>
+        /// <param name="key">The key parts</param>
+        /// <param name="value">The value</param>
+        /// <param name="level">The configuration file which should be considered as the target of this operation</param>
+        public virtual void Add(string key, string value, ConfigurationLevel level)
+        {
+            Ensure.ArgumentNotNull(value, "value");
+            Ensure.ArgumentNotNullOrEmptyString(key, "key");
+
+            using (ConfigurationHandle h = RetrieveConfigurationHandle(level, true, configHandle))
+            {
+                Proxy.git_config_add_string(h, key, value);
             }
         }
 
@@ -676,16 +715,16 @@ namespace LibGit2Sharp
         {
             Ensure.ArgumentNotNullOrEmptyString(regexp, "regexp");
 
-            using (ConfigurationSafeHandle snapshot = Snapshot())
-            using (ConfigurationSafeHandle h = RetrieveConfigurationHandle(level, true, snapshot))
+            using (ConfigurationHandle snapshot = Snapshot())
+            using (ConfigurationHandle h = RetrieveConfigurationHandle(level, true, snapshot))
             {
-                return Proxy.git_config_iterator_glob(h, regexp, BuildConfigEntry).ToList();
+                return Proxy.git_config_iterator_glob(h, regexp).ToList();
             }
         }
 
-        private ConfigurationSafeHandle RetrieveConfigurationHandle(ConfigurationLevel level, bool throwIfStoreHasNotBeenFound, ConfigurationSafeHandle fromHandle)
+        private ConfigurationHandle RetrieveConfigurationHandle(ConfigurationLevel level, bool throwIfStoreHasNotBeenFound, ConfigurationHandle fromHandle)
         {
-            ConfigurationSafeHandle handle = null;
+            ConfigurationHandle handle = null;
             if (fromHandle != null)
             {
                 handle = Proxy.git_config_open_level(fromHandle, level);
@@ -693,20 +732,19 @@ namespace LibGit2Sharp
 
             if (handle == null && throwIfStoreHasNotBeenFound)
             {
-                throw new LibGit2SharpException(string.Format(CultureInfo.InvariantCulture,
-                                                              "No {0} configuration file has been found.",
-                                                              Enum.GetName(typeof(ConfigurationLevel), level)));
+                throw new LibGit2SharpException("No {0} configuration file has been found.",
+                                                              Enum.GetName(typeof(ConfigurationLevel), level));
             }
 
             return handle;
         }
 
-        private static Action<string, object, ConfigurationSafeHandle> GetUpdater<T>(Action<ConfigurationSafeHandle, string, T> setter)
+        private static Action<string, object, ConfigurationHandle> GetUpdater<T>(Action<ConfigurationHandle, string, T> setter)
         {
             return (key, val, handle) => setter(handle, key, (T)val);
         }
 
-        private readonly static IDictionary<Type, Action<string, object, ConfigurationSafeHandle>> configurationTypedUpdater = new Dictionary<Type, Action<string, object, ConfigurationSafeHandle>>
+        private readonly static IDictionary<Type, Action<string, object, ConfigurationHandle>> configurationTypedUpdater = new Dictionary<Type, Action<string, object, ConfigurationHandle>>
         {
             { typeof(int), GetUpdater<int>(Proxy.git_config_set_int32) },
             { typeof(long), GetUpdater<long>(Proxy.git_config_set_int64) },
@@ -733,13 +771,12 @@ namespace LibGit2Sharp
             return Proxy.git_config_foreach(configHandle, BuildConfigEntry);
         }
 
-        private static ConfigurationEntry<string> BuildConfigEntry(IntPtr entryPtr)
+        internal static unsafe ConfigurationEntry<string> BuildConfigEntry(IntPtr entryPtr)
         {
-            var entry = entryPtr.MarshalAs<GitConfigEntry>();
-
-            return new ConfigurationEntry<string>(LaxUtf8Marshaler.FromNative(entry.namePtr),
-                                                  LaxUtf8Marshaler.FromNative(entry.valuePtr),
-                                                  (ConfigurationLevel)entry.level);
+            var entry = (GitConfigEntry*)entryPtr.ToPointer();
+            return new ConfigurationEntry<string>(LaxUtf8Marshaler.FromNative(entry->namePtr),
+                                                  LaxUtf8Marshaler.FromNative(entry->valuePtr),
+                                                  (ConfigurationLevel)entry->level);
         }
 
         /// <summary>
@@ -780,9 +817,33 @@ namespace LibGit2Sharp
             return signature;
         }
 
-        private ConfigurationSafeHandle Snapshot()
+        private ConfigurationHandle Snapshot()
         {
             return Proxy.git_config_snapshot(configHandle);
+        }
+
+        /// <summary>
+        /// Perform a series of actions within a transaction.
+        ///
+        /// The configuration will be locked during this function and the changes will be committed at the end. These
+        /// changes will not be visible in the configuration until the end of this method.
+        ///
+        /// If the action throws an exception, the changes will be rolled back.
+        /// </summary>
+        /// <param name="action">The code to run under the transaction</param>
+        public virtual unsafe void WithinTransaction(Action action)
+        {
+            IntPtr txn = IntPtr.Zero;
+            try
+            {
+                txn = Proxy.git_config_lock(configHandle);
+                action();
+                Proxy.git_transaction_commit(txn);
+            }
+            finally
+            {
+                Proxy.git_transaction_free(txn);
+            }
         }
     }
 }

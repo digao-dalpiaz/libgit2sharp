@@ -70,39 +70,17 @@ namespace LibGit2Sharp
         SubmoduleCollection Submodules { get; }
 
         /// <summary>
-        /// Checkout the commit pointed at by the tip of the specified <see cref="Branch"/>.
-        /// <para>
-        ///   If this commit is the current tip of the branch as it exists in the repository, the HEAD
-        ///   will point to this branch. Otherwise, the HEAD will be detached, pointing at the commit sha.
-        /// </para>
+        /// Worktrees in the repository.
         /// </summary>
-        /// <param name="branch">The <see cref="Branch"/> to check out.</param>
-        /// <param name="options"><see cref="CheckoutOptions"/> controlling checkout behavior.</param>
-        /// <returns>The <see cref="Branch"/> that was checked out.</returns>
-        Branch Checkout(Branch branch, CheckoutOptions options);
+        WorktreeCollection Worktrees { get; }
 
         /// <summary>
-        /// Checkout the specified branch, reference or SHA.
-        /// <para>
-        ///   If the committishOrBranchSpec parameter resolves to a branch name, then the checked out HEAD will
-        ///   will point to the branch. Otherwise, the HEAD will be detached, pointing at the commit sha.
-        /// </para>
+        /// Checkout the specified tree.
         /// </summary>
-        /// <param name="committishOrBranchSpec">A revparse spec for the commit or branch to checkout.</param>
-        /// <param name="options"><see cref="CheckoutOptions"/> controlling checkout behavior.</param>
-        /// <returns>The <see cref="Branch"/> that was checked out.</returns>
-        Branch Checkout(string committishOrBranchSpec, CheckoutOptions options);
-
-        /// <summary>
-        /// Checkout the specified <see cref="LibGit2Sharp.Commit"/>.
-        /// <para>
-        ///   Will detach the HEAD and make it point to this commit sha.
-        /// </para>
-        /// </summary>
-        /// <param name="commit">The <see cref="LibGit2Sharp.Commit"/> to check out.</param>
-        /// <param name="options"><see cref="CheckoutOptions"/> controlling checkout behavior.</param>
-        /// <returns>The <see cref="Branch"/> that was checked out.</returns>
-        Branch Checkout(Commit commit, CheckoutOptions options);
+        /// <param name="tree">The <see cref="Tree"/> to checkout.</param>
+        /// <param name="paths">The paths to checkout.</param>
+        /// <param name="opts">Collection of parameters controlling checkout behavior.</param>
+        void Checkout(Tree tree, IEnumerable<string> paths, CheckoutOptions opts);
 
         /// <summary>
         /// Updates specifed paths in the index and working directory with the versions from the specified branch, reference, or SHA.
@@ -166,16 +144,13 @@ namespace LibGit2Sharp
         void Reset(ResetMode resetMode, Commit commit);
 
         /// <summary>
-        /// Replaces entries in the <see cref="Repository.Index"/> with entries from the specified commit.
+        /// Sets <see cref="Head"/> to the specified commit and optionally resets the <see cref="Index"/> and
+        /// the content of the working tree to match.
         /// </summary>
+        /// <param name="resetMode">Flavor of reset operation to perform.</param>
         /// <param name="commit">The target commit object.</param>
-        /// <param name="paths">The list of paths (either files or directories) that should be considered.</param>
-        /// <param name="explicitPathsOptions">
-        /// If set, the passed <paramref name="paths"/> will be treated as explicit paths.
-        /// Use these options to determine how unmatched explicit paths should be handled.
-        /// </param>
-        [Obsolete("This method will be removed in the next release. Please use Index.Replace() instead.")]
-        void Reset(Commit commit, IEnumerable<string> paths, ExplicitPathsOptions explicitPathsOptions);
+        /// <param name="options">Collection of parameters controlling checkout behavior.</param>
+        void Reset(ResetMode resetMode, Commit commit, CheckoutOptions options);
 
         /// <summary>
         /// Clean the working tree by removing files that are not under version control.
@@ -268,104 +243,6 @@ namespace LibGit2Sharp
         BlameHunkCollection Blame(string path, BlameOptions options);
 
         /// <summary>
-        /// Promotes to the staging area the latest modifications of a file in the working directory (addition, updation or removal).
-        ///
-        /// If this path is ignored by configuration then it will not be staged unless <see cref="StageOptions.IncludeIgnored"/> is unset.
-        /// </summary>
-        /// <param name="path">The path of the file within the working directory.</param>
-        /// <param name="stageOptions">Determines how paths will be staged.</param>
-        void Stage(string path, StageOptions stageOptions);
-
-        /// <summary>
-        /// Promotes to the staging area the latest modifications of a collection of files in the working directory (addition, updation or removal).
-        ///
-        /// Any paths (even those listed explicitly) that are ignored by configuration will not be staged unless <see cref="StageOptions.IncludeIgnored"/> is unset.
-        /// </summary>
-        /// <param name="paths">The collection of paths of the files within the working directory.</param>
-        /// <param name="stageOptions">Determines how paths will be staged.</param>
-        void Stage(IEnumerable<string> paths, StageOptions stageOptions);
-
-        /// <summary>
-        /// Removes from the staging area all the modifications of a file since the latest commit (addition, updation or removal).
-        /// </summary>
-        /// <param name="path">The path of the file within the working directory.</param>
-        /// <param name="explicitPathsOptions">
-        /// The passed <paramref name="path"/> will be treated as explicit paths.
-        /// Use these options to determine how unmatched explicit paths should be handled.
-        /// </param>
-        void Unstage(string path, ExplicitPathsOptions explicitPathsOptions);
-
-        /// <summary>
-        /// Removes from the staging area all the modifications of a collection of file since the latest commit (addition, updation or removal).
-        /// </summary>
-        /// <param name="paths">The collection of paths of the files within the working directory.</param>
-        /// <param name="explicitPathsOptions">
-        /// The passed <paramref name="paths"/> will be treated as explicit paths.
-        /// Use these options to determine how unmatched explicit paths should be handled.
-        /// </param>
-        void Unstage(IEnumerable<string> paths, ExplicitPathsOptions explicitPathsOptions);
-
-        /// <summary>
-        /// Moves and/or renames a file in the working directory and promotes the change to the staging area.
-        /// </summary>
-        /// <param name="sourcePath">The path of the file within the working directory which has to be moved/renamed.</param>
-        /// <param name="destinationPath">The target path of the file within the working directory.</param>
-        void Move(string sourcePath, string destinationPath);
-
-        /// <summary>
-        /// Moves and/or renames a collection of files in the working directory and promotes the changes to the staging area.
-        /// </summary>
-        /// <param name="sourcePaths">The paths of the files within the working directory which have to be moved/renamed.</param>
-        /// <param name="destinationPaths">The target paths of the files within the working directory.</param>
-        void Move(IEnumerable<string> sourcePaths, IEnumerable<string> destinationPaths);
-
-        /// <summary>
-        /// Removes a file from the staging area, and optionally removes it from the working directory as well.
-        /// <para>
-        ///   If the file has already been deleted from the working directory, this method will only deal
-        ///   with promoting the removal to the staging area.
-        /// </para>
-        /// <para>
-        ///   The default behavior is to remove the file from the working directory as well.
-        /// </para>
-        /// <para>
-        ///   When not passing a <paramref name="explicitPathsOptions"/>, the passed path will be treated as
-        ///   a pathspec. You can for example use it to pass the relative path to a folder inside the working directory,
-        ///   so that all files beneath this folders, and the folder itself, will be removed.
-        /// </para>
-        /// </summary>
-        /// <param name="path">The path of the file within the working directory.</param>
-        /// <param name="removeFromWorkingDirectory">True to remove the file from the working directory, False otherwise.</param>
-        /// <param name="explicitPathsOptions">
-        /// The passed <paramref name="path"/> will be treated as an explicit path.
-        /// Use these options to determine how unmatched explicit paths should be handled.
-        /// </param>
-        void Remove(string path, bool removeFromWorkingDirectory, ExplicitPathsOptions explicitPathsOptions);
-
-        /// <summary>
-        /// Removes a collection of fileS from the staging, and optionally removes them from the working directory as well.
-        /// <para>
-        ///   If a file has already been deleted from the working directory, this method will only deal
-        ///   with promoting the removal to the staging area.
-        /// </para>
-        /// <para>
-        ///   The default behavior is to remove the files from the working directory as well.
-        /// </para>
-        /// <para>
-        ///   When not passing a <paramref name="explicitPathsOptions"/>, the passed paths will be treated as
-        ///   a pathspec. You can for example use it to pass the relative paths to folders inside the working directory,
-        ///   so that all files beneath these folders, and the folders themselves, will be removed.
-        /// </para>
-        /// </summary>
-        /// <param name="paths">The collection of paths of the files within the working directory.</param>
-        /// <param name="removeFromWorkingDirectory">True to remove the files from the working directory, False otherwise.</param>
-        /// <param name="explicitPathsOptions">
-        /// The passed <paramref name="paths"/> will be treated as explicit paths.
-        /// Use these options to determine how unmatched explicit paths should be handled.
-        /// </param>
-        void Remove(IEnumerable<string> paths, bool removeFromWorkingDirectory, ExplicitPathsOptions explicitPathsOptions);
-
-        /// <summary>
         /// Retrieves the state of a file in the working directory, comparing it against the staging area and the latest commit.
         /// </summary>
         /// <param name="filePath">The relative path within the working directory to the file.</param>
@@ -388,7 +265,7 @@ namespace LibGit2Sharp
         /// </para>
         /// <para>
         ///   Optionally, the <paramref name="options"/> parameter allow to tweak the
-        ///   search strategy (considering lightweith tags, or even branches as reference points)
+        ///   search strategy (considering lightweight tags, or even branches as reference points)
         ///   and the formatting of the returned identifier.
         /// </para>
         /// </summary>
@@ -396,5 +273,14 @@ namespace LibGit2Sharp
         /// <param name="options">Determines how the commit will be described.</param>
         /// <returns>A descriptive identifier for the commit based on the nearest annotated tag.</returns>
         string Describe(Commit commit, DescribeOptions options);
+
+        /// <summary>
+        /// Parse an extended SHA-1 expression and retrieve the object and the reference
+        /// mentioned in the revision (if any).
+        /// </summary>
+        /// <param name="revision">An extended SHA-1 expression for the object to look up</param>
+        /// <param name="reference">The reference mentioned in the revision (if any)</param>
+        /// <param name="obj">The object which the revision resolves to</param>
+        void RevParse(string revision, out Reference reference, out GitObject obj);
     }
 }

@@ -35,6 +35,9 @@
         public StatusOptions()
         {
             DetectRenamesInIndex = true;
+            IncludeIgnored = true;
+            IncludeUntracked = true;
+            RecurseUntrackedDirs = true;
         }
 
         /// <summary>
@@ -63,6 +66,11 @@
         public bool RecurseIgnoredDirs { get; set; }
 
         /// <summary>
+        /// Recurse into untracked directories
+        /// </summary>
+        public bool RecurseUntrackedDirs { get; set; }
+
+        /// <summary>
         /// Limit the scope of paths to consider to the provided pathspecs
         /// </summary>
         /// <remarks>
@@ -84,5 +92,18 @@
         /// Unaltered meaning the file is identical in the working directory, the index and HEAD.
         /// </remarks>
         public bool IncludeUnaltered { get; set; }
+
+        /// <summary>
+        /// Include ignored files when scanning for status
+        /// </summary>
+        /// <remarks>
+        /// ignored meaning present in .gitignore. Defaults to true for back compat but may improve perf to not include if you have thousands of ignored files.
+        /// </remarks>
+        public bool IncludeIgnored { get; set; }
+
+        /// <summary>
+        /// Include untracked files when scanning for status
+        /// </summary>
+        public bool IncludeUntracked { get; set; }
     }
 }

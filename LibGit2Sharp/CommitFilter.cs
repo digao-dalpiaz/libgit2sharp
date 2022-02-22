@@ -6,7 +6,7 @@ using System.Linq;
 namespace LibGit2Sharp
 {
     /// <summary>
-    /// Criterias used to filter out and order the commits of the repository when querying its history.
+    /// Criteria used to filter out and order the commits of the repository when querying its history.
     /// </summary>
     public sealed class CommitFilter
     {
@@ -21,7 +21,7 @@ namespace LibGit2Sharp
         }
 
         /// <summary>
-        /// The ordering stragtegy to use.
+        /// The ordering strategy to use.
         /// <para>
         ///   By default, the commits are shown in reverse chronological order.
         /// </para>
@@ -37,42 +37,11 @@ namespace LibGit2Sharp
         ///   By default, the <see cref="Repository.Head"/> will be used as boundary.
         /// </para>
         /// </summary>
-        [Obsolete("This property will be removed in the next release. Please use IncludeReachableFrom instead.")]
-        public object Since
-        {
-            get { return IncludeReachableFrom; }
-            set { IncludeReachableFrom = value; }
-        }
-
-        /// <summary>
-        /// A pointer to a commit object or a list of pointers to consider as starting points.
-        /// <para>
-        ///   Can be either a <see cref="string"/> containing the sha or reference canonical name to use,
-        ///   a <see cref="Branch"/>, a <see cref="Reference"/>, a <see cref="Commit"/>, a <see cref="Tag"/>,
-        ///   a <see cref="TagAnnotation"/>, an <see cref="ObjectId"/> or even a mixed collection of all of the above.
-        ///   By default, the <see cref="Repository.Head"/> will be used as boundary.
-        /// </para>
-        /// </summary>
         public object IncludeReachableFrom { get; set; }
 
         internal IList<object> SinceList
         {
             get { return ToList(IncludeReachableFrom); }
-        }
-
-        /// <summary>
-        /// A pointer to a commit object or a list of pointers which will be excluded (along with ancestors) from the enumeration.
-        /// <para>
-        ///   Can be either a <see cref="string"/> containing the sha or reference canonical name to use,
-        ///   a <see cref="Branch"/>, a <see cref="Reference"/>, a <see cref="Commit"/>, a <see cref="Tag"/>,
-        ///   a <see cref="TagAnnotation"/>, an <see cref="ObjectId"/> or even a mixed collection of all of the above.
-        /// </para>
-        /// </summary>
-        [Obsolete("This property will be removed in the next release. Please use ExcludeReachableFrom instead.")]
-        public object Until
-        {
-            get { return ExcludeReachableFrom; }
-            set { ExcludeReachableFrom = value; }
         }
 
         /// <summary>

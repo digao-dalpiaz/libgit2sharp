@@ -10,6 +10,135 @@
   - Windows (x86/amd64): <https://ci.appveyor.com/project/libgit2/libgit2sharp>
   - Linux/Mac OS X: <https://travis-ci.org/libgit2/libgit2sharp>
 
+## v0.26 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.25..v0.26))
+
+### Additions
+
+* Add `CherryPickCommitIntoIndex` to `ObjectDatabase`
+* The underlying native library (libgit2) now no longer relies on libcurl
+* The underlying native library now no longer relies on zlib
+* Add `IndentHeuristic` option to `CompareOptions`
+
+## v0.25 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.24..v0.25))
+
+LibGit2Sharp is now .NET Core 2.0+ and .NET Framework compatible.
+
+### Additions
+
+ - `GitObject` now has a `Peel` method that will let you peel (for example)
+    a `Tag` to a `Tree`.
+ - `MergeOptions` now includes an option to `IgnoreWhitespaceChanges`.
+ - `TreeDefinition` can now `Add` an object with only the ID, which allows
+   users of large files to add entries without realizing a `Blob`.
+ - `ObjectDatabase` can now `Write` a `Stream`, which allows users of
+   large files to stream an object into storage without loading it into
+   memory.
+ - `ObjectDatabase` can now `MergeCommitsIntoIndex` allowing users to perform
+   an in-memory merge that produces an `Index` structure with conflicts.
+ - Users can enable or disable dependent object existence checks when
+   creating new objects with `GlobalSettings.SetEnableStrictObjectCreation`
+ - Users can enable or disable `ofs_delta` support with
+   `GlobalSettings.SetEnableOfsDelta`
+
+### Changes
+
+ - Status now does not show untracked files by default.  To retrieve
+   untracked files, included the `StatusOptions.IncludeUntracked` and/or
+   the `StatusOptions.RecurseUntrackedDirs` options.
+ - Status now does not show the ignored files by default.  To retrieve
+   ignored files, include the `StatusOptions.IncludeIgnored` option.
+ - `Commands.Pull` can now provide a `null` value for `PullOptions`,
+   which indicates that default values should be used.
+
+### Fixes
+
+ - The exception thrown when the native library cannot be loaded is now
+   able to be caught and will no longer crash the process.
+ - Getting the `Notes` collection from a `Repository` no longer throws an
+   exception when the repository has no notes.
+
+## v0.24 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.23..v0.24))
+
+This is the last release before a moving to .NET Core compatible library.
+
+It will be the last supported release with the prior architecture; as a
+result, this release is primarily bugfixes and does not include major new
+APIs.
+
+## v0.23 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.22..v0.23))
+
+### Additions
+
+ - Add `CherryPickCommit` and `RevertCommit` to `ObjectDatabase`.
+ - Add `IncludeIgnored` field to `SatusOptions`.
+ - Add `Commit.CreateBuffer` to write a commit object to a buffer and
+   `ObjectDatabase.CreateCommitWithSignature` to create commits which include a
+   signature.
+ - Add `Commit.ExtractSignature` to get a commit's signature.
+ - Add `ObjectDatabase.Write<T>` to write arbitrary objects to the object db.
+ - Add `Commit.PrettifyMessage`
+
+
+### Changes
+
+ - The native libraries are now expected to be in the `lib` directory,
+   instead of `NativeBinaries` for improved mono compatibility.  In
+   addition, the names of platform architectures now better reflect
+   the vendor naming (eg, `x86_64` instead of `amd64` on Linux).
+ - Deprecate the config paths in RepositoryOptions
+ - Deprecate the `QueryBy` overload with `FollowFilter`.
+ - Deprecate `Branch.Remote` in favour of `Branch.RemoteName`
+ - `Remote` no longer implement the equality operator.
+ - `Remote.Update` takes a remote name instead of an instance.
+ - `Fetch`, `Pull`, `Move`, `Remove`, `Stage` are now in a commands namespace to
+   indicate what they represent.
+
+## v0.22 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.21.1...v0.22))
+
+### Additions
+
+ - Add CustomHeaders in the push options (#1217)
+ - Expose the minimal diff algorithm (#1229)
+ - Expose Reset() with checkout options (#1219)
+ - Add a prettify option to history rewrite options (#1185)
+ - Add option to describe to only follow the first parent (#1190)
+ - Allow setting the config search path (#1123)
+ - Provide access to the remote's host HTTPS certificate (#1134)
+ - Add support for rebase (#964)
+ - ListReferences() now accepts a credentials provider (#1099)
+ - Introduce FileStatus.Conflicted and introduce staging of conflicts (#1062)
+ - Support streaming filters written in C# (#1030)
+ - Add support for the pre-push callback (#1061)
+ - Add support for listing remote references without a Repository instance (#1065)
+ - Add StashCollection.Apply() and .Pop() (#1068)
+ - Support retrieving a configuration for a repository without instantiating it (#1042)
+ - Implement 'log --follow'-like functionality (#963)
+ - Introduce in-memory merging via Repository.MergeCommits() (#990)
+ - Allow setting whether to prune during a fetch (#1258)
+
+### Changes
+
+ - Deprecate MergeConflictException in a backwards-compatible way (#1243)
+ - Improve type safety in the generic type for Diff.Compare() (#1180)
+ - Obsolete Repository.Commit(), NoteCollection.Add() and
+   NoteCollection.Remove() overloads which do not require a signature (#1173)
+ - BuildSignature() no longer tries to build a signature from the
+   environment if there is none configured (#1171)
+ - Rename the commit walker's Since to IncludeReachableFrom and Until to ExcludeReachableFrom (#1069)
+ - Rename MergeConflictException to CheckoutConflictException to more
+   accurately reflect what it means (#1059)
+ - Specify the diff algorithm instead of setting a boolean to use patience (#1043)
+ - Remove optional parameters (#1031)
+ - Move Repository.Reset(paths) into Index (#959)
+ - Move FindMergeBase() overloads to ObjectDatabase (#957)
+
+### Fixes
+
+ - ListReferences() is now able to handle symbolic references (#1132)
+ - Repository.IsValid() returns false on empty paths (#1156)
+ - The included version of libgit2 includes racy-git support
+ - Fix a racy NRE in the filters (#1113)
+
 ## v0.21.1 - ([diff](https://github.com/libgit2/libgit2sharp/compare/v0.21...v0.21.1))
 
 ### Changes

@@ -1,5 +1,10 @@
-﻿namespace LibGit2Sharp
+﻿using System;
+
+namespace LibGit2Sharp
 {
-    public interface IDiffResult
+    /// <summary>
+    ///   Marker interface to identify Diff results.
+    /// </summary>
+    public interface IDiffResult: IDisposable
     { }
 }

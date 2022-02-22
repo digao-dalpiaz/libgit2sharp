@@ -62,9 +62,8 @@ namespace LibGit2Sharp
             {
                 if (handle == null)
                 {
-                    throw new NotFoundException(string.Format(CultureInfo.InvariantCulture,
-                                                              "Submodule lookup failed for '{0}'.",
-                                                              name));
+                    throw new NotFoundException("Submodule lookup failed for '{0}'.",
+                                                name);
                 }
 
                 Proxy.git_submodule_init(handle, overwrite);
@@ -90,9 +89,8 @@ namespace LibGit2Sharp
             {
                 if (handle == null)
                 {
-                    throw new NotFoundException(string.Format(CultureInfo.InvariantCulture,
-                                                              "Submodule lookup failed for '{0}'.",
-                                                              name));
+                    throw new NotFoundException("Submodule lookup failed for '{0}'.",
+                                                              name);
                 }
 
                 using (GitCheckoutOptsWrapper checkoutOptionsWrapper = new GitCheckoutOptsWrapper(options))
@@ -102,11 +100,11 @@ namespace LibGit2Sharp
                     var remoteCallbacks = new RemoteCallbacks(options);
                     var gitRemoteCallbacks = remoteCallbacks.GenerateCallbacks();
 
-                    var gitSubmoduleUpdateOpts = new GitSubmoduleOptions
+                    var gitSubmoduleUpdateOpts = new GitSubmoduleUpdateOptions
                     {
                         Version = 1,
                         CheckoutOptions = gitCheckoutOptions,
-                        FetchOptions = new GitFetchOptions { RemoteCallbacks = gitRemoteCallbacks },
+                        FetchOptions = new GitFetchOptions { ProxyOptions = new GitProxyOptions { Version = 1 }, RemoteCallbacks = gitRemoteCallbacks },
                         CloneCheckoutStrategy = CheckoutStrategy.GIT_CHECKOUT_SAFE
                     };
 
@@ -148,7 +146,7 @@ namespace LibGit2Sharp
                           });
         }
 
-        internal T Lookup<T>(string name, Func<SubmoduleSafeHandle, T> selector, bool throwIfNotFound = false)
+        internal T Lookup<T>(string name, Func<SubmoduleHandle, T> selector, bool throwIfNotFound = false)
         {
             using (var handle = Proxy.git_submodule_lookup(repo.Handle, name))
             {
@@ -160,7 +158,7 @@ namespace LibGit2Sharp
 
                 if (throwIfNotFound)
                 {
-                    throw new LibGit2SharpException(CultureInfo.InvariantCulture, "Submodule lookup failed for '{0}'.", name);
+                    throw new LibGit2SharpException("Submodule lookup failed for '{0}'.", name);
                 }
 
                 return default(T);

@@ -5,27 +5,29 @@ namespace LibGit2Sharp.Core
 {
     internal class ObjectSafeWrapper : IDisposable
     {
-        private readonly GitObjectSafeHandle objectPtr;
+        private readonly ObjectHandle objectPtr;
 
-        public ObjectSafeWrapper(ObjectId id, RepositorySafeHandle handle, bool allowNullObjectId = false)
+        public unsafe ObjectSafeWrapper(ObjectId id, RepositoryHandle handle, bool allowNullObjectId = false, bool throwIfMissing = false)
         {
             Ensure.ArgumentNotNull(handle, "handle");
 
             if (allowNullObjectId && id == null)
             {
-                objectPtr = new NullGitObjectSafeHandle();
+                objectPtr = new ObjectHandle(null, false);
             }
             else
             {
                 Ensure.ArgumentNotNull(id, "id");
                 objectPtr = Proxy.git_object_lookup(handle, id, GitObjectType.Any);
             }
+
+            if (objectPtr == null && throwIfMissing)
+            {
+                throw new NotFoundException($"No valid git object identified by '{id}' exists in the repository.");
+            }
         }
 
-        public GitObjectSafeHandle ObjectPtr
-        {
-            get { return objectPtr; }
-        }
+        public ObjectHandle ObjectPtr => objectPtr;
 
         public void Dispose()
         {

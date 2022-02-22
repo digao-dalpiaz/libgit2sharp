@@ -9,7 +9,7 @@ namespace LibGit2Sharp
     /// is performed against an index with unmerged entries
     /// </summary>
     [Serializable]
-    public class UnmergedIndexEntriesException : LibGit2SharpException
+    public class UnmergedIndexEntriesException : NativeException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="UnmergedIndexEntriesException"/> class.
@@ -23,6 +23,15 @@ namespace LibGit2Sharp
         /// <param name="message">A message that describes the error.</param>
         public UnmergedIndexEntriesException(string message)
             : base(message)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnmergedIndexEntriesException"/> class with a specified error message.
+        /// </summary>
+        /// <param name="format">A composite format string for use in <see cref="String.Format(IFormatProvider, string, object[])"/>.</param>
+        /// <param name="args">An object array that contains zero or more objects to format.</param>
+        public UnmergedIndexEntriesException(string format, params object[] args)
+            : base(format, args)
         { }
 
         /// <summary>
@@ -43,8 +52,16 @@ namespace LibGit2Sharp
             : base(info, context)
         { }
 
-        internal UnmergedIndexEntriesException(string message, GitErrorCode code, GitErrorCategory category)
-            : base(message, code, category)
+        internal UnmergedIndexEntriesException(string message, GitErrorCategory category)
+            : base(message, category)
         { }
+
+        internal override GitErrorCode ErrorCode
+        {
+            get
+            {
+                return GitErrorCode.UnmergedEntries;
+            }
+        }
     }
 }

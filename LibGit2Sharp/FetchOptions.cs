@@ -16,5 +16,35 @@
         /// retrieved during this fetch will be retrieved as well).</para>
         /// </summary>
         public TagFetchMode? TagFetchMode { get; set; }
+
+        /// <summary>
+        /// Specifies the pruning behaviour for the fetch operation
+        /// <para>
+        /// If not set, the configuration's setting will take effect. If true, the branches which no longer
+        /// exist on the remote will be removed from the remote-tracking branches.
+        /// </para>
+        /// </summary>
+        public bool? Prune { get; set; }
+
+        /// <summary>
+        /// Get/Set the custom headers.
+        /// 
+        /// <para> 
+        /// This allows you to set custom headers (e.g. X-Forwarded-For, 
+        /// X-Request-Id, etc),
+        /// </para>
+        /// </summary>
+        /// <remarks>
+        /// Libgit2 sets some headers for HTTP requests (User-Agent, Host, 
+        /// Accept, Content-Type, Transfer-Encoding, Content-Length, Accept) that
+        /// cannot be overriden.
+        /// </remarks>
+        /// <example>
+        /// var fetchOptions - new FetchOptions() {
+        ///     CustomHeaders = new String[] {"X-Request-Id: 12345"}
+        /// };
+        /// </example>
+        /// <value>The custom headers string array</value>
+        public string[] CustomHeaders { get; set; }
     }
 }

@@ -23,7 +23,7 @@ namespace LibGit2Sharp.Tests
 
                 // Initial commit assertions
                 Assert.Equal("timothy.clem@gmail.com", reflog.Last().Committer.Email);
-                Assert.True(reflog.Last().Message.StartsWith("clone: from"));
+                Assert.StartsWith("clone: from", reflog.Last().Message);
                 Assert.Equal(ObjectId.Zero, reflog.Last().From);
 
                 // second commit assertions
@@ -68,7 +68,7 @@ namespace LibGit2Sharp.Tests
 
                 const string relativeFilepath = "new.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "content\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 var author = Constants.Signature;
                 const string commitMessage = "Hope reflog behaves as it should";
@@ -78,7 +78,7 @@ namespace LibGit2Sharp.Tests
                 Commit commit = repo.Commit(commitMessage, author, author);
 
                 // Assert a reflog entry is created on HEAD
-                Assert.Equal(1, repo.Refs.Log("HEAD").Count());
+                Assert.Single(repo.Refs.Log("HEAD"));
                 var reflogEntry = repo.Refs.Log("HEAD").First();
 
                 Assert.Equal(identity.Name, reflogEntry.Committer.Name);
@@ -91,7 +91,7 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(ObjectId.Zero, reflogEntry.From);
 
                 // Assert the same reflog entry is created on refs/heads/master
-                Assert.Equal(1, repo.Refs.Log("refs/heads/master").Count());
+                Assert.Single(repo.Refs.Log("refs/heads/master"));
                 reflogEntry = repo.Refs.Log("HEAD").First();
 
                 Assert.Equal(identity.Name, reflogEntry.Committer.Name);
@@ -103,7 +103,7 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(ObjectId.Zero, reflogEntry.From);
 
                 // Assert no reflog entry is created on refs/heads/unit_test
-                Assert.Equal(0, repo.Refs.Log("refs/heads/unit_test").Count());
+                Assert.Empty(repo.Refs.Log("refs/heads/unit_test"));
             }
         }
 
@@ -116,14 +116,14 @@ namespace LibGit2Sharp.Tests
             {
                 const string relativeFilepath = "new.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "content\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 var author = Constants.Signature;
                 const string commitMessage = "First commit should be logged as initial";
                 repo.Commit(commitMessage, author, author);
 
                 // Assert the reflog entry message is correct
-                Assert.Equal(1, repo.Refs.Log("HEAD").Count());
+                Assert.Single(repo.Refs.Log("HEAD"));
                 Assert.Equal(string.Format("commit (initial): {0}", commitMessage), repo.Refs.Log("HEAD").First().Message);
             }
         }
@@ -140,12 +140,12 @@ namespace LibGit2Sharp.Tests
                 Assert.False(repo.Info.IsHeadDetached);
 
                 var parentCommit = repo.Head.Tip.Parents.First();
-                repo.Checkout(parentCommit.Sha);
+                Commands.Checkout(repo, parentCommit.Sha);
                 Assert.True(repo.Info.IsHeadDetached);
 
                 const string relativeFilepath = "new.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "content\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 var author = Constants.Signature;
                 const string commitMessage = "Commit on detached head";

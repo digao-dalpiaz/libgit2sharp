@@ -126,11 +126,6 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNullOrEmptyString(targetTreeEntryPath, "targetTreeEntryPath");
             Ensure.ArgumentNotNull(treeEntryDefinition, "treeEntryDefinition");
 
-            if (Path.IsPathRooted(targetTreeEntryPath))
-            {
-                throw new ArgumentException("The provided path is an absolute path.");
-            }
-
             if (treeEntryDefinition is TransientTreeTreeEntryDefinition)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
@@ -202,6 +197,23 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNullOrEmptyString(filePath, "filePath");
 
             TreeEntryDefinition ted = TreeEntryDefinition.TransientBlobFrom(filePath, mode);
+
+            return Add(targetTreeEntryPath, ted);
+        }
+
+        /// <summary>
+        /// Adds or replaces a <see cref="TreeEntryDefinition"/> from an existing blob specified by its Object ID at the specified <paramref name="targetTreeEntryPath"/> location.
+        /// </summary>
+        /// <param name="targetTreeEntryPath">The path within this <see cref="TreeDefinition"/>.</param>
+        /// <param name="id">The object ID for this entry.</param>
+        /// <param name="mode">The file related <see cref="Mode"/> attributes.</param>
+        /// <returns>The current <see cref="TreeDefinition"/>.</returns>
+        public virtual TreeDefinition Add(string targetTreeEntryPath, ObjectId id, Mode mode)
+        {
+            Ensure.ArgumentNotNull(id, "id");
+            Ensure.ArgumentConformsTo(mode, m => m.HasAny(TreeEntryDefinition.BlobModes), "mode");
+
+            TreeEntryDefinition ted = TreeEntryDefinition.From(id, mode);
 
             return Add(targetTreeEntryPath, ted);
         }
@@ -383,9 +395,9 @@ namespace LibGit2Sharp
             }
         }
 
-        private static Tuple<string, string> ExtractPosixLeadingSegment(FilePath targetPath)
+        private static Tuple<string, string> ExtractPosixLeadingSegment(string targetPath)
         {
-            string[] segments = targetPath.Posix.Split(new[] { '/' }, 2);
+            string[] segments = targetPath.Split(new[] { '/' }, 2);
 
             if (segments[0] == string.Empty || (segments.Length == 2 && (segments[1] == string.Empty || segments[1].StartsWith("/", StringComparison.Ordinal))))
             {
@@ -397,7 +409,7 @@ namespace LibGit2Sharp
 
         private class TreeBuilder : IDisposable
         {
-            private readonly TreeBuilderSafeHandle handle;
+            private readonly TreeBuilderHandle handle;
 
             public TreeBuilder(Repository repo)
             {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 
 namespace LibGit2Sharp.Core
 {
@@ -11,29 +12,64 @@ namespace LibGit2Sharp.Core
 
     internal static class Platform
     {
-        public static string ProcessorArchitecture
-        {
-            get { return Environment.Is64BitProcess ? "amd64" : "x86"; }
-        }
+        public static string ProcessorArchitecture => RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
 
         public static OperatingSystemType OperatingSystem
         {
             get
             {
-                // See http://www.mono-project.com/docs/faq/technical/#how-to-detect-the-execution-platform
-                switch ((int)Environment.OSVersion.Platform)
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    case 4:
-                    case 128:
-                        return OperatingSystemType.Unix;
-
-                    case 6:
-                        return OperatingSystemType.MacOSX;
-
-                    default:
-                        return OperatingSystemType.Windows;
+                    return OperatingSystemType.Windows;
                 }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    return OperatingSystemType.Unix;
+                }
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    return OperatingSystemType.MacOSX;
+                }
+
+                throw new PlatformNotSupportedException();
             }
         }
+
+        public static string GetNativeLibraryExtension()
+        {
+            switch (OperatingSystem)
+            {
+                case OperatingSystemType.MacOSX:
+                    return ".dylib";
+
+                case OperatingSystemType.Unix:
+                    return ".so";
+
+                case OperatingSystemType.Windows:
+                    return ".dll";
+            }
+
+            throw new PlatformNotSupportedException();
+        }
+
+        /// <summary>
+        /// Returns true if the runtime is Mono.
+        /// </summary>
+        public static bool IsRunningOnMono()
+            => Type.GetType("Mono.Runtime") != null;
+
+        /// <summary>
+        /// Returns true if the runtime is .NET Framework.
+        /// </summary>
+        public static bool IsRunningOnNetFramework()
+            => typeof(object).Assembly.GetName().Name == "mscorlib" && !IsRunningOnMono();
+
+        /// <summary>
+        /// Returns true if the runtime is .NET Core.
+        /// </summary>
+        public static bool IsRunningOnNetCore()
+            => typeof(object).Assembly.GetName().Name != "mscorlib";
     }
 }

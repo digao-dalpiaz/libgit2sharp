@@ -1,4 +1,6 @@
-﻿namespace LibGit2Sharp
+﻿using System;
+
+namespace LibGit2Sharp
 {
     /// <summary>
     /// Provides optional additional information to the Repository to be opened.
@@ -25,33 +27,6 @@
         /// </para>
         /// </summary>
         public string IndexPath { get; set; }
-
-        /// <summary>
-        /// Overrides the probed location of the Global configuration file of a repository.
-        /// <para>
-        ///   The path has either to lead to an existing valid configuration file,
-        ///   or to a non existent configuration file which will be eventually created.
-        /// </para>
-        /// </summary>
-        public string GlobalConfigurationLocation { get; set; }
-
-        /// <summary>
-        /// Overrides the probed location of the XDG configuration file of a repository.
-        /// <para>
-        ///   The path has either to lead to an existing valid configuration file,
-        ///   or to a non existent configuration file which will be eventually created.
-        /// </para>
-        /// </summary>
-        public string XdgConfigurationLocation { get; set; }
-
-        /// <summary>
-        /// Overrides the probed location of the System configuration file of a repository.
-        /// <para>
-        ///   The path has to lead to an existing valid configuration file,
-        ///   or to a non existent configuration file which will be eventually created.
-        /// </para>
-        /// </summary>
-        public string SystemConfigurationLocation { get; set; }
 
         /// <summary>
         /// Overrides the default identity to be used when creating reflog entries.

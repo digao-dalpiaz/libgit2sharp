@@ -29,12 +29,12 @@ namespace LibGit2Sharp.Tests
                 var submodule = repo.Submodules["sm_branch_only"];
                 Assert.Null(submodule);
 
-                repo.Checkout("dev", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+                Commands.Checkout(repo, "dev", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
                 submodule = repo.Submodules["sm_branch_only"];
                 Assert.NotNull(submodule);
                 Assert.NotEqual(SubmoduleStatus.Unmodified, submodule.RetrieveStatus());
 
-                repo.Checkout("master", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+                Commands.Checkout(repo, "master", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
                 submodule = repo.Submodules["sm_branch_only"];
                 Assert.Null(submodule);
             }
@@ -133,12 +133,10 @@ namespace LibGit2Sharp.Tests
         }
 
         [Theory]
-        [InlineData("sm_changed_head", false)]
-        [InlineData("sm_changed_head", true)]
-        public void CanStageChangeInSubmoduleViaIndexStage(string submodulePath, bool appendPathSeparator)
+        [InlineData("sm_changed_head")]
+        [InlineData("sm_changed_head/")]
+        public void CanStageChangeInSubmoduleViaIndexStage(string submodulePath)
         {
-            submodulePath += appendPathSeparator ? Path.DirectorySeparatorChar : default(char?);
-
             var path = SandboxSubmoduleTestRepo();
             using (var repo = new Repository(path))
             {
@@ -148,7 +146,7 @@ namespace LibGit2Sharp.Tests
                 var statusBefore = submodule.RetrieveStatus();
                 Assert.Equal(SubmoduleStatus.WorkDirModified, statusBefore & SubmoduleStatus.WorkDirModified);
 
-                repo.Stage(submodulePath);
+                Commands.Stage(repo, submodulePath);
 
                 var statusAfter = submodule.RetrieveStatus();
                 Assert.Equal(SubmoduleStatus.IndexModified, statusAfter & SubmoduleStatus.IndexModified);
@@ -156,12 +154,10 @@ namespace LibGit2Sharp.Tests
         }
 
         [Theory]
-        [InlineData("sm_changed_head", false)]
-        [InlineData("sm_changed_head", true)]
-        public void CanStageChangeInSubmoduleViaIndexStageWithOtherPaths(string submodulePath, bool appendPathSeparator)
+        [InlineData("sm_changed_head")]
+        [InlineData("sm_changed_head/")]
+        public void CanStageChangeInSubmoduleViaIndexStageWithOtherPaths(string submodulePath)
         {
-            submodulePath += appendPathSeparator ? Path.DirectorySeparatorChar : default(char?);
-
             var path = SandboxSubmoduleTestRepo();
             using (var repo = new Repository(path))
             {
@@ -173,7 +169,7 @@ namespace LibGit2Sharp.Tests
 
                 Touch(repo.Info.WorkingDirectory, "new-file.txt");
 
-                repo.Stage(new[] { "new-file.txt", submodulePath, "does-not-exist.txt" });
+                Commands.Stage(repo, new[] { "new-file.txt", submodulePath, "does-not-exist.txt" });
 
                 var statusAfter = submodule.RetrieveStatus();
                 Assert.Equal(SubmoduleStatus.IndexModified, statusAfter & SubmoduleStatus.IndexModified);
@@ -300,7 +296,7 @@ namespace LibGit2Sharp.Tests
 
                 Assert.True(submodule.RetrieveStatus().HasFlag(SubmoduleStatus.InWorkDir));
 
-                repo.Checkout("alternate");
+                Commands.Checkout(repo, "alternate");
                 Assert.True(submodule.RetrieveStatus().HasFlag(SubmoduleStatus.WorkDirModified));
 
                 submodule = repo.Submodules[submoduleName];

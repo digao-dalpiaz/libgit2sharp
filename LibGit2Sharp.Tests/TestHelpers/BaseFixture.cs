@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using LibGit2Sharp.Core;
 using Xunit;
 
 namespace LibGit2Sharp.Tests.TestHelpers
@@ -16,12 +15,14 @@ namespace LibGit2Sharp.Tests.TestHelpers
     {
         private readonly List<string> directories = new List<string>();
 
-#if LEAKS_IDENTIFYING
         public BaseFixture()
         {
-            LeaksContainer.Clear();
-        }
+            BuildFakeConfigs(this);
+
+#if LEAKS_IDENTIFYING
+            Core.LeaksContainer.Clear();
 #endif
+        }
 
         static BaseFixture()
         {
@@ -41,6 +42,9 @@ namespace LibGit2Sharp.Tests.TestHelpers
         private static string SubmoduleTargetTestRepoWorkingDirPath { get; set; }
         private static string AssumeUnchangedRepoWorkingDirPath { get; set; }
         public static string SubmoduleSmallTestRepoWorkingDirPath { get; set; }
+        public static string WorktreeTestRepoWorkingDirPath { get; private set; }
+        public static string WorktreeTestRepoWorktreesDirPath { get; private set; }
+        public static string PackBuilderTestRepoPath { get; private set; }
 
         public static DirectoryInfo ResourcesDirectory { get; private set; }
 
@@ -48,34 +52,80 @@ namespace LibGit2Sharp.Tests.TestHelpers
 
         protected static DateTimeOffset TruncateSubSeconds(DateTimeOffset dto)
         {
-            int seconds = dto.ToSecondsSinceEpoch();
-            return Epoch.ToDateTimeOffset(seconds, (int)dto.Offset.TotalMinutes);
+            var seconds = dto.ToUnixTimeSeconds();
+            return DateTimeOffset.FromUnixTimeSeconds(seconds).ToOffset(dto.Offset);
         }
 
         private static void SetUpTestEnvironment()
         {
             IsFileSystemCaseSensitive = IsFileSystemCaseSensitiveInternal();
 
-            string initialAssemblyParentFolder = Directory.GetParent(new Uri(typeof(BaseFixture).Assembly.EscapedCodeBase).LocalPath).FullName;
+            var resourcesPath = Environment.GetEnvironmentVariable("LIBGIT2SHARP_RESOURCES");
 
-            const string sourceRelativePath = @"../../Resources";
-            ResourcesDirectory = new DirectoryInfo(Path.Combine(initialAssemblyParentFolder, sourceRelativePath));
+            if (resourcesPath == null)
+            {
+#if NETFRAMEWORK
+                resourcesPath = Path.Combine(Directory.GetParent(new Uri(typeof(BaseFixture).GetTypeInfo().Assembly.CodeBase).LocalPath).FullName, "Resources");
+#else
+                resourcesPath = Path.Combine(Directory.GetParent(typeof(BaseFixture).GetTypeInfo().Assembly.Location).FullName, "Resources");
+#endif
+            }
+
+            ResourcesDirectory = new DirectoryInfo(resourcesPath);
 
             // Setup standard paths to our test repositories
-            BareTestRepoPath = Path.Combine(sourceRelativePath, "testrepo.git");
-            StandardTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "testrepo_wd");
+            BareTestRepoPath = Path.Combine(ResourcesDirectory.FullName, "testrepo.git");
+            StandardTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "testrepo_wd");
             StandardTestRepoPath = Path.Combine(StandardTestRepoWorkingDirPath, "dot_git");
-            ShallowTestRepoPath = Path.Combine(sourceRelativePath, "shallow.git");
-            MergedTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "mergedrepo_wd");
-            MergeRenamesTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "mergerenames_wd");
-            MergeTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "merge_testrepo_wd");
-            RevertTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "revert_testrepo_wd");
-            SubmoduleTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "submodule_wd");
-            SubmoduleTargetTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "submodule_target_wd");
-            AssumeUnchangedRepoWorkingDirPath = Path.Combine(sourceRelativePath, "assume_unchanged_wd");
-            SubmoduleSmallTestRepoWorkingDirPath = Path.Combine(sourceRelativePath, "submodule_small_wd");
+            ShallowTestRepoPath = Path.Combine(ResourcesDirectory.FullName, "shallow.git");
+            MergedTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "mergedrepo_wd");
+            MergeRenamesTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "mergerenames_wd");
+            MergeTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "merge_testrepo_wd");
+            RevertTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "revert_testrepo_wd");
+            SubmoduleTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "submodule_wd");
+            SubmoduleTargetTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "submodule_target_wd");
+            AssumeUnchangedRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "assume_unchanged_wd");
+            SubmoduleSmallTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "submodule_small_wd");
+            PackBuilderTestRepoPath = Path.Combine(ResourcesDirectory.FullName, "packbuilder_testrepo_wd");
+            WorktreeTestRepoWorkingDirPath = Path.Combine(ResourcesDirectory.FullName, "worktree", "testrepo_wd");
+            WorktreeTestRepoWorktreesDirPath = Path.Combine(ResourcesDirectory.FullName, "worktree", "worktrees");
 
             CleanupTestReposOlderThan(TimeSpan.FromMinutes(15));
+        }
+
+        public static void BuildFakeConfigs(IPostTestDirectoryRemover dirRemover)
+        {
+            var scd = new SelfCleaningDirectory(dirRemover);
+
+            string global = null, xdg = null, system = null, programData = null;
+            BuildFakeRepositoryOptions(scd, out global, out xdg, out system, out programData);
+
+            StringBuilder sb = new StringBuilder()
+                .AppendFormat("[Woot]{0}", Environment.NewLine)
+                .AppendFormat("this-rocks = global{0}", Environment.NewLine)
+                .AppendFormat("[Wow]{0}", Environment.NewLine)
+                .AppendFormat("Man-I-am-totally-global = 42{0}", Environment.NewLine);
+            File.WriteAllText(Path.Combine(global, ".gitconfig"), sb.ToString());
+
+            sb = new StringBuilder()
+                .AppendFormat("[Woot]{0}", Environment.NewLine)
+                .AppendFormat("this-rocks = system{0}", Environment.NewLine);
+            File.WriteAllText(Path.Combine(system, "gitconfig"), sb.ToString());
+
+            sb = new StringBuilder()
+                .AppendFormat("[Woot]{0}", Environment.NewLine)
+                .AppendFormat("this-rocks = xdg{0}", Environment.NewLine);
+            File.WriteAllText(Path.Combine(xdg, "config"), sb.ToString());
+
+            sb = new StringBuilder()
+                .AppendFormat("[Woot]{0}", Environment.NewLine)
+                .AppendFormat("this-rocks = programdata{0}", Environment.NewLine);
+            File.WriteAllText(Path.Combine(programData, "config"), sb.ToString());
+
+            GlobalSettings.SetConfigSearchPaths(ConfigurationLevel.Global, global);
+            GlobalSettings.SetConfigSearchPaths(ConfigurationLevel.Xdg, xdg);
+            GlobalSettings.SetConfigSearchPaths(ConfigurationLevel.System, system);
+            GlobalSettings.SetConfigSearchPaths(ConfigurationLevel.ProgramData, programData);
         }
 
         private static void CleanupTestReposOlderThan(TimeSpan olderThan)
@@ -174,6 +224,16 @@ namespace LibGit2Sharp.Tests.TestHelpers
             return path;
         }
 
+        public string SandboxWorktreeTestRepo()
+        {
+            return Sandbox(WorktreeTestRepoWorkingDirPath, WorktreeTestRepoWorktreesDirPath);
+        }
+
+        protected string SandboxPackBuilderTestRepo()
+        {
+            return Sandbox(PackBuilderTestRepoPath);
+        }
+
         protected string Sandbox(string sourceDirectoryPath, params string[] additionalSourcePaths)
         {
             var scd = BuildSelfCleaningDirectory();
@@ -200,14 +260,6 @@ namespace LibGit2Sharp.Tests.TestHelpers
             return Repository.Init(scd.DirectoryPath, isBare);
         }
 
-        protected Repository InitIsolatedRepository(string path = null, bool isBare = false, RepositoryOptions options = null)
-        {
-            path = path ?? InitNewRepository(isBare);
-            options = BuildFakeConfigs(BuildSelfCleaningDirectory(), options);
-
-            return new Repository(path, options);
-        }
-
         public void Register(string directoryPath)
         {
             directories.Add(directoryPath);
@@ -224,11 +276,11 @@ namespace LibGit2Sharp.Tests.TestHelpers
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            if (LeaksContainer.TypeNames.Any())
+            if (Core.LeaksContainer.TypeNames.Any())
             {
                 Assert.False(true, string.Format("Some handles of the following types haven't been properly released: {0}.{1}"
-                    + "In order to get some help fixing those leaks, uncomment the define LEAKS_TRACKING in SafeHandleBase.cs{1}"
-                    + "and run the tests locally.", string.Join(", ", LeaksContainer.TypeNames), Environment.NewLine));
+                    + "In order to get some help fixing those leaks, uncomment the define LEAKS_TRACKING in Libgit2Object.cs{1}"
+                    + "and run the tests locally.", string.Join(", ", Core.LeaksContainer.TypeNames), Environment.NewLine));
             }
 #endif
         }
@@ -286,42 +338,19 @@ namespace LibGit2Sharp.Tests.TestHelpers
             Assert.True(r.Success, text);
         }
 
-        public RepositoryOptions BuildFakeConfigs(SelfCleaningDirectory scd, RepositoryOptions options = null)
+        private static void BuildFakeRepositoryOptions(SelfCleaningDirectory scd, out string global, out string xdg, out string system, out string programData)
         {
-            options = BuildFakeRepositoryOptions(scd, options);
-
-            StringBuilder sb = new StringBuilder()
-                .AppendFormat("[Woot]{0}", Environment.NewLine)
-                .AppendFormat("this-rocks = global{0}", Environment.NewLine)
-                .AppendFormat("[Wow]{0}", Environment.NewLine)
-                .AppendFormat("Man-I-am-totally-global = 42{0}", Environment.NewLine);
-            File.WriteAllText(options.GlobalConfigurationLocation, sb.ToString());
-
-            sb = new StringBuilder()
-                .AppendFormat("[Woot]{0}", Environment.NewLine)
-                .AppendFormat("this-rocks = system{0}", Environment.NewLine);
-            File.WriteAllText(options.SystemConfigurationLocation, sb.ToString());
-
-            sb = new StringBuilder()
-                .AppendFormat("[Woot]{0}", Environment.NewLine)
-                .AppendFormat("this-rocks = xdg{0}", Environment.NewLine);
-            File.WriteAllText(options.XdgConfigurationLocation, sb.ToString());
-
-            return options;
-        }
-
-        private static RepositoryOptions BuildFakeRepositoryOptions(SelfCleaningDirectory scd, RepositoryOptions options = null)
-        {
-            options = options ?? new RepositoryOptions();
-
             string confs = Path.Combine(scd.DirectoryPath, "confs");
             Directory.CreateDirectory(confs);
 
-            options.GlobalConfigurationLocation = Path.Combine(confs, "my-global-config");
-            options.XdgConfigurationLocation = Path.Combine(confs, "my-xdg-config");
-            options.SystemConfigurationLocation = Path.Combine(confs, "my-system-config");
-
-            return options;
+            global = Path.Combine(confs, "my-global-config");
+            Directory.CreateDirectory(global);
+            xdg = Path.Combine(confs, "my-xdg-config");
+            Directory.CreateDirectory(xdg);
+            system = Path.Combine(confs, "my-system-config");
+            Directory.CreateDirectory(system);
+            programData = Path.Combine(confs, "my-programdata-config");
+            Directory.CreateDirectory(programData);
         }
 
         /// <summary>
@@ -330,18 +359,14 @@ namespace LibGit2Sharp.Tests.TestHelpers
         /// <remarks>The configuration file will be removed automatically when the tests are finished</remarks>
         /// <param name="identity">The identity to use for user.name and user.email</param>
         /// <returns>The path to the configuration file</returns>
-        protected string CreateConfigurationWithDummyUser(Identity identity)
+        protected void CreateConfigurationWithDummyUser(Repository repo, Identity identity)
         {
-            return CreateConfigurationWithDummyUser(identity.Name, identity.Email);
+            CreateConfigurationWithDummyUser(repo, identity.Name, identity.Email);
         }
 
-        protected string CreateConfigurationWithDummyUser(string name, string email)
+        protected void CreateConfigurationWithDummyUser(Repository repo, string name, string email)
         {
-            SelfCleaningDirectory scd = BuildSelfCleaningDirectory();
-
-            string configFilePath = Touch(scd.DirectoryPath, "fake-config");
-
-            using (Configuration config = Configuration.BuildFrom(configFilePath))
+            Configuration config = repo.Config;
             {
                 if (name != null)
                 {
@@ -353,8 +378,6 @@ namespace LibGit2Sharp.Tests.TestHelpers
                     config.Set("user.email", email);
                 }
             }
-
-            return configFilePath;
         }
 
         /// <summary>
@@ -376,9 +399,18 @@ namespace LibGit2Sharp.Tests.TestHelpers
             string dir = Path.GetDirectoryName(filePath);
             Debug.Assert(dir != null);
 
+            var newFile = !File.Exists(filePath);
+
             Directory.CreateDirectory(dir);
 
             File.WriteAllText(filePath, content ?? string.Empty, encoding ?? Encoding.ASCII);
+
+            //Workaround for .NET Core 1.x behavior where all newly created files have execute permissions set.
+            //https://github.com/dotnet/corefx/issues/13342
+            if (Constants.IsRunningOnUnix && newFile)
+            {
+                RemoveExecutePermissions(filePath, newFile);
+            }
 
             return filePath;
         }
@@ -391,6 +423,8 @@ namespace LibGit2Sharp.Tests.TestHelpers
             string dir = Path.GetDirectoryName(filePath);
             Debug.Assert(dir != null);
 
+            var newFile = !File.Exists(filePath);
+
             Directory.CreateDirectory(dir);
 
             using (var fs = File.Open(filePath, FileMode.Create))
@@ -399,7 +433,20 @@ namespace LibGit2Sharp.Tests.TestHelpers
                 fs.Flush();
             }
 
+            //Work around .NET Core 1.x behavior where all newly created files have execute permissions set.
+            //https://github.com/dotnet/corefx/issues/13342
+            if (Constants.IsRunningOnUnix && newFile)
+            {
+                RemoveExecutePermissions(filePath, newFile);
+            }
+
             return filePath;
+        }
+
+        private static void RemoveExecutePermissions(string filePath, bool newFile)
+        {
+            var process = Process.Start("chmod", $"644 {filePath}");
+            process.WaitForExit();
         }
 
         protected string Expected(string filename)
@@ -423,7 +470,11 @@ namespace LibGit2Sharp.Tests.TestHelpers
             Assert.Equal(@from ?? ObjectId.Zero, reflogEntry.From);
 
             Assert.Equal(committer.Email, reflogEntry.Committer.Email);
-            Assert.InRange(reflogEntry.Committer.When, before, DateTimeOffset.Now);
+
+            // When verifying the timestamp range, give a little more room on the 'before' side.
+            // Git or file system datetime truncation seems to cause these stamps to jump up to a second earlier
+            // than we expect. See https://github.com/libgit2/libgit2sharp/issues/1764
+            Assert.InRange(reflogEntry.Committer.When, before - TimeSpan.FromSeconds(1), DateTimeOffset.Now);
         }
 
         protected static void EnableRefLog(IRepository repository, bool enable = true)

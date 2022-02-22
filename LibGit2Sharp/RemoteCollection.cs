@@ -43,28 +43,27 @@ namespace LibGit2Sharp
         {
             Ensure.ArgumentNotNull(name, "name");
 
-            using (RemoteSafeHandle handle = Proxy.git_remote_lookup(repository.Handle, name, shouldThrowIfNotFound))
-            {
-                return handle == null ? null : Remote.BuildFromPtr(handle, this.repository);
-            }
+            RemoteHandle handle = Proxy.git_remote_lookup(repository.Handle, name, shouldThrowIfNotFound);
+            return handle == null ? null : new Remote(handle, this.repository);
         }
 
         /// <summary>
         /// Update properties of a remote.
+        ///
+        /// These updates will be performed as a bulk update at the end of the method.
         /// </summary>
-        /// <param name="remote">The remote to update.</param>
+        /// <param name="remote">The name of the remote to update.</param>
         /// <param name="actions">Delegate to perform updates on the remote.</param>
-        /// <returns>The updated remote.</returns>
-        public virtual Remote Update(Remote remote, params Action<RemoteUpdater>[] actions)
+        public virtual void Update(string remote, params Action<RemoteUpdater>[] actions)
         {
             var updater = new RemoteUpdater(repository, remote);
 
-            foreach (Action<RemoteUpdater> action in actions)
-            {
-                action(updater);
-            }
-
-            return this[remote.Name];
+            repository.Config.WithinTransaction(() => {
+                foreach (Action<RemoteUpdater> action in actions)
+                {
+                    action(updater);
+                }
+            });
         }
 
         /// <summary>
@@ -102,10 +101,8 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(name, "name");
             Ensure.ArgumentNotNull(url, "url");
 
-            using (RemoteSafeHandle handle = Proxy.git_remote_create(repository.Handle, name, url))
-            {
-                return Remote.BuildFromPtr(handle, this.repository);
-            }
+            RemoteHandle handle = Proxy.git_remote_create(repository.Handle, name, url);
+            return new Remote(handle, this.repository);
         }
 
         /// <summary>
@@ -121,10 +118,8 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(url, "url");
             Ensure.ArgumentNotNull(fetchRefSpec, "fetchRefSpec");
 
-            using (RemoteSafeHandle handle = Proxy.git_remote_create_with_fetchspec(repository.Handle, name, url, fetchRefSpec))
-            {
-                return Remote.BuildFromPtr(handle, this.repository);
-            }
+            RemoteHandle handle = Proxy.git_remote_create_with_fetchspec(repository.Handle, name, url, fetchRefSpec);
+            return new Remote(handle, this.repository);
         }
 
         /// <summary>

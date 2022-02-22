@@ -19,7 +19,7 @@ namespace LibGit2Sharp.Tests
             {
                 if (fromDetachedHead)
                 {
-                    repo.Checkout(repo.Head.Tip.Id.Sha);
+                    Commands.Checkout(repo, repo.Head.Tip.Id.Sha);
                 }
 
                 Commit commitToMerge = repo.Branches["fast_forward"].Tip;
@@ -46,7 +46,7 @@ namespace LibGit2Sharp.Tests
             using (var repo = new Repository(path))
             {
                 var firstBranch = repo.CreateBranch("FirstBranch");
-                repo.Checkout(firstBranch);
+                Commands.Checkout(repo, firstBranch);
 
                 // Commit with ONE new file to both first & second branch (SecondBranch is created on this commit).
                 AddFileCommitToRepo(repo, sharedBranchFileName);
@@ -56,7 +56,7 @@ namespace LibGit2Sharp.Tests
                 AddFileCommitToRepo(repo, firstBranchFileName);
                 AddFileCommitToRepo(repo, sharedBranchFileName, "The first branches comment");  // Change file in first branch
 
-                repo.Checkout(secondBranch);
+                Commands.Checkout(repo, secondBranch);
                 // Commit with ONE new file to second branch (FirstBranch and SecondBranch now point to separate commits that both have the same parent commit).
                 AddFileCommitToRepo(repo, secondBranchFileName);
                 AddFileCommitToRepo(repo, sharedBranchFileName, "The second branches comment");  // Change file in second branch
@@ -66,7 +66,7 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(CherryPickStatus.Conflicts, cherryPickResult.Status);
 
                 Assert.Null(cherryPickResult.Commit);
-                Assert.Equal(1, repo.Index.Conflicts.Count());
+                Assert.Single(repo.Index.Conflicts);
 
                 var conflict = repo.Index.Conflicts.First();
                 var changes = repo.Diff.Compare(repo.Lookup<Blob>(conflict.Theirs.Id), repo.Lookup<Blob>(conflict.Ours.Id));
@@ -126,11 +126,97 @@ namespace LibGit2Sharp.Tests
             }
         }
 
+        [Fact]
+        public void CanCherryPickCommit()
+        {
+            string path = SandboxMergeTestRepo();
+            using (var repo = new Repository(path))
+            {
+                var ours = repo.Head.Tip;
+
+                Commit commitToMerge = repo.Branches["fast_forward"].Tip;
+
+                var result = repo.ObjectDatabase.CherryPickCommit(commitToMerge, ours, 0, null);
+
+                Assert.Equal(MergeTreeStatus.Succeeded, result.Status);
+                Assert.Empty(result.Conflicts);
+            }
+        }
+
+        [Fact]
+        public void CherryPickWithConflictsReturnsConflicts()
+        {
+            const string conflictBranchName = "conflicts";
+
+            string path = SandboxMergeTestRepo();
+            using (var repo = new Repository(path))
+            {
+                Branch branch = repo.Branches[conflictBranchName];
+                Assert.NotNull(branch);
+
+                var result = repo.ObjectDatabase.CherryPickCommit(branch.Tip, repo.Head.Tip, 0, null);
+
+                Assert.Equal(MergeTreeStatus.Conflicts, result.Status);
+                Assert.NotEmpty(result.Conflicts);
+
+            }
+        }
+
+        [Fact]
+        public void CanCherryPickCommitIntoIndex()
+        {
+            string path = SandboxMergeTestRepo();
+            using (var repo = new Repository(path))
+            {
+                var ours = repo.Head.Tip;
+
+                Commit commitToMerge = repo.Branches["fast_forward"].Tip;
+
+                using (TransientIndex index = repo.ObjectDatabase.CherryPickCommitIntoIndex(commitToMerge, ours, 0, null))
+                {
+                    var tree = index.WriteToTree();
+                    Assert.Equal(commitToMerge.Tree.Id, tree.Id);
+                }
+            }
+        }
+
+        [Fact]
+        public void CanCherryPickIntoIndexWithConflicts()
+        {
+            const string conflictBranchName = "conflicts";
+
+            string path = SandboxMergeTestRepo();
+            using (var repo = new Repository(path))
+            {
+                Branch branch = repo.Branches[conflictBranchName];
+                Assert.NotNull(branch);
+
+                using (TransientIndex index = repo.ObjectDatabase.CherryPickCommitIntoIndex(branch.Tip, repo.Head.Tip, 0, null))
+                {
+                    Assert.False(index.IsFullyMerged);
+
+                    var conflict = index.Conflicts.First();
+
+                    //Resolve the conflict by taking the blob from branch
+                    var blob = repo.Lookup<Blob>(conflict.Theirs.Id);
+                    //Add() does not remove conflict entries for the same path, so they must be explicitly removed first.
+                    index.Remove(conflict.Ours.Path);
+                    index.Add(blob, conflict.Ours.Path, Mode.NonExecutableFile);
+
+                    Assert.True(index.IsFullyMerged);
+                    var tree = index.WriteToTree();
+
+                    //Since we took the conflicted blob from the branch, the merged result should be the same as the branch.
+                    Assert.Equal(branch.Tip.Tree.Id, tree.Id);
+                }
+            }
+        }
+
         private Commit AddFileCommitToRepo(IRepository repository, string filename, string content = null)
         {
             Touch(repository.Info.WorkingDirectory, filename, content);
 
-            repository.Stage(filename);
+            Commands.Stage(repository, filename);
 
             return repository.Commit("New commit", Constants.Signature, Constants.Signature);
         }

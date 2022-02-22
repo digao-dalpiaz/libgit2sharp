@@ -37,8 +37,7 @@ namespace LibGit2Sharp
 
             if (!Reference.IsValidName(canonicalName))
             {
-                throw new InvalidSpecificationException(
-                    string.Format(CultureInfo.InvariantCulture, "The given reference name '{0}' is not valid", canonicalName));
+                throw new InvalidSpecificationException("The given reference name '{0}' is not valid", canonicalName);
             }
 
             this.repo = repo;
@@ -54,17 +53,17 @@ namespace LibGit2Sharp
         /// </para>
         /// </summary>
         /// <returns>An <see cref="IEnumerator{T}"/> object that can be used to iterate through the collection.</returns>
-        public virtual IEnumerator<ReflogEntry> GetEnumerator()
+        public virtual unsafe IEnumerator<ReflogEntry> GetEnumerator()
         {
             var entries = new List<ReflogEntry>();
 
-            using (ReflogSafeHandle reflog = Proxy.git_reflog_read(repo.Handle, canonicalName))
+            using (ReflogHandle reflog = Proxy.git_reflog_read(repo.Handle, canonicalName))
             {
                 var entriesCount = Proxy.git_reflog_entrycount(reflog);
 
                 for (int i = 0; i < entriesCount; i++)
                 {
-                    ReflogEntrySafeHandle handle = Proxy.git_reflog_entry_byindex(reflog, i);
+                    git_reflog_entry* handle = Proxy.git_reflog_entry_byindex(reflog, i);
                     entries.Add(new ReflogEntry(handle));
                 }
             }

@@ -5,16 +5,21 @@ using System.Globalization;
 using System.Linq;
 using LibGit2Sharp.Core;
 using LibGit2Sharp.Core.Handles;
+using System.Text;
+using System;
 
 namespace LibGit2Sharp
 {
     /// <summary>
     /// A container which references a list of other <see cref="Tree"/>s and <see cref="Blob"/>s.
     /// </summary>
+    /// <remarks>
+    /// Since the introduction of partially cloned repositories, trees might be missing on your local repository (see https://git-scm.com/docs/partial-clone)
+    /// </remarks>
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
     public class Tree : GitObject, IEnumerable<TreeEntry>
     {
-        private readonly FilePath path;
+        private readonly string path;
 
         private readonly ILazy<int> lazyCount;
 
@@ -24,69 +29,89 @@ namespace LibGit2Sharp
         protected Tree()
         { }
 
-        internal Tree(Repository repo, ObjectId id, FilePath path)
+        internal Tree(Repository repo, ObjectId id, string path)
             : base(repo, id)
         {
             this.path = path ?? "";
 
-            lazyCount = GitObjectLazyGroup.Singleton(repo, id, Proxy.git_tree_entrycount);
+            lazyCount = GitObjectLazyGroup.Singleton(repo, id, Proxy.git_tree_entrycount, throwIfMissing: true);
         }
 
         /// <summary>
         /// Gets the number of <see cref="TreeEntry"/> immediately under this <see cref="Tree"/>.
         /// </summary>
-        public virtual int Count { get { return lazyCount.Value; } }
+        /// <exception cref="NotFoundException">Throws if tree is missing</exception>
+        public virtual int Count => lazyCount.Value;
 
         /// <summary>
         /// Gets the <see cref="TreeEntry"/> pointed at by the <paramref name="relativePath"/> in this <see cref="Tree"/> instance.
         /// </summary>
         /// <param name="relativePath">The relative path to the <see cref="TreeEntry"/> from this instance.</param>
         /// <returns><c>null</c> if nothing has been found, the <see cref="TreeEntry"/> otherwise.</returns>
+        /// <exception cref="NotFoundException">Throws if tree is missing</exception>
         public virtual TreeEntry this[string relativePath]
         {
             get { return RetrieveFromPath(relativePath); }
         }
 
-        private TreeEntry RetrieveFromPath(FilePath relativePath)
+        private unsafe TreeEntry RetrieveFromPath(string relativePath)
         {
-            if (relativePath.IsNullOrEmpty())
+            if (string.IsNullOrEmpty(relativePath))
             {
                 return null;
             }
 
-            using (TreeEntrySafeHandle_Owned treeEntryPtr = Proxy.git_tree_entry_bypath(repo.Handle, Id, relativePath))
+            using (TreeEntryHandle treeEntry = Proxy.git_tree_entry_bypath(repo.Handle, Id, relativePath))
             {
-                if (treeEntryPtr == null)
+                if (treeEntry == null)
                 {
                     return null;
                 }
 
-                string posixPath = relativePath.Posix;
-                string filename = posixPath.Split('/').Last();
-                string parentPath = posixPath.Substring(0, posixPath.Length - filename.Length);
-                return new TreeEntry(treeEntryPtr, Id, repo, path.Combine(parentPath));
+                string filename = relativePath.Split('/').Last();
+                string parentPath = relativePath.Substring(0, relativePath.Length - filename.Length);
+                return new TreeEntry(treeEntry, Id, repo, Tree.CombinePath(path, parentPath));
             }
         }
 
-        internal string Path
-        {
-            get { return path.Native; }
-        }
+        internal string Path => path;
 
         #region IEnumerable<TreeEntry> Members
+
+        unsafe TreeEntry byIndex(ObjectSafeWrapper obj, uint i, ObjectId parentTreeId, Repository repo, string parentPath)
+        {
+            using (var entryHandle = Proxy.git_tree_entry_byindex(obj.ObjectPtr, i))
+            {
+                return new TreeEntry(entryHandle, parentTreeId, repo, parentPath);
+            }
+        }
+
+        internal static string CombinePath(string a, string b)
+        {
+            var bld = new StringBuilder();
+            bld.Append(a);
+            if (!String.IsNullOrEmpty(a) &&
+                !a.EndsWith("/", StringComparison.Ordinal) &&
+                !b.StartsWith("/", StringComparison.Ordinal))
+            {
+                bld.Append('/');
+            }
+            bld.Append(b);
+
+            return bld.ToString();
+        }
 
         /// <summary>
         /// Returns an enumerator that iterates through the collection.
         /// </summary>
         /// <returns>An <see cref="IEnumerator{T}"/> object that can be used to iterate through the collection.</returns>
+        /// <exception cref="NotFoundException">Throws if tree is missing</exception>
         public virtual IEnumerator<TreeEntry> GetEnumerator()
         {
-            using (var obj = new ObjectSafeWrapper(Id, repo.Handle))
+            using (var obj = new ObjectSafeWrapper(Id, repo.Handle, throwIfMissing: true))
             {
-                for (uint i = 0; i < Count; i++)
-                {
-                    TreeEntrySafeHandle handle = Proxy.git_tree_entry_byindex(obj.ObjectPtr, i);
-                    yield return new TreeEntry(handle, Id, repo, path);
+                for (uint i = 0; i < Count; i++) {
+                    yield return byIndex(obj, i, Id, repo, path);
                 }
             }
         }
@@ -95,6 +120,7 @@ namespace LibGit2Sharp
         /// Returns an enumerator that iterates through the collection.
         /// </summary>
         /// <returns>An <see cref="IEnumerator"/> object that can be used to iterate through the collection.</returns>
+        /// <exception cref="NotFoundException">Throws if tree is missing</exception>
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();

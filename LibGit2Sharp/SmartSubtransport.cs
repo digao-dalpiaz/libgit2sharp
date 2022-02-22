@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using LibGit2Sharp.Core;
+using LibGit2Sharp.Core.Handles;
 
 namespace LibGit2Sharp
 {
@@ -47,6 +49,109 @@ namespace LibGit2Sharp
     /// </summary>
     public abstract class SmartSubtransport
     {
+        internal IntPtr Transport { get; set; }
+
+        /// <summary>
+        /// Call the certificate check callback
+        /// </summary>
+        /// <param name="cert">The certificate to send</param>
+        /// <param name="valid">Whether we consider the certificate to be valid</param>
+        /// <param name="hostname">The hostname we connected to</param>
+        public int CertificateCheck(Certificate cert, bool valid, string hostname)
+        {
+            CertificateSsh sshCert = cert as CertificateSsh;
+            CertificateX509 x509Cert = cert as CertificateX509;
+
+            if (sshCert == null && x509Cert == null)
+            {
+                throw new InvalidOperationException("Unsupported certificate type");
+            }
+
+            int ret;
+            if (sshCert != null)
+            {
+                var certPtr = sshCert.ToPointer();
+                ret = NativeMethods.git_transport_smart_certificate_check(Transport, certPtr, valid ? 1 : 0, hostname);
+                Marshal.FreeHGlobal(certPtr);
+            } else {
+                IntPtr certPtr, dataPtr;
+                certPtr = x509Cert.ToPointers(out dataPtr);
+                ret = NativeMethods.git_transport_smart_certificate_check(Transport, certPtr, valid ? 1 : 0, hostname);
+                Marshal.FreeHGlobal(dataPtr);
+                Marshal.FreeHGlobal(certPtr);
+            }
+
+            if (ret > 0 || ret == (int)GitErrorCode.PassThrough)
+            {
+                ret = valid ? 0 : -1;
+            }
+
+            return ret;
+        }
+
+        /// <summary>
+        /// Acquires credentials.
+        /// </summary>
+        /// <param name="cred">Receives the credentials if the operation is successful.</param>
+        /// <param name="user">The username.</param>
+        /// <param name="methods">The credential types allowed. The only supported one is <see cref="UsernamePasswordCredentials"/>. May be empty but should not be null.</param>
+        /// <returns>0 if successful; a non-zero error code that came from <see cref="Proxy.git_transport_smart_credentials"/> otherwise.</returns>
+        public int AcquireCredentials(out Credentials cred, string user, params Type[] methods)
+        {
+            // Convert the user-provided types to libgit2's flags
+            int allowed = 0;
+            foreach (var method in methods)
+            {
+                if (method == typeof(UsernamePasswordCredentials))
+                {
+                    allowed |= (int)GitCredentialType.UserPassPlaintext;
+                }
+                else if (method == typeof(DefaultCredentials))
+                {
+                    allowed |= (int)GitCredentialType.Default;
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unknown type passes as allowed credential");
+                }
+            }
+
+            IntPtr credHandle = IntPtr.Zero;
+            int res = Proxy.git_transport_smart_credentials(out credHandle, Transport, user, allowed);
+            if (res != 0)
+            {
+                cred = null;
+                return res;
+            }
+
+            if (credHandle == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("credentials callback indicated success but returned no credentials");
+            }
+
+            unsafe
+            {
+                var baseCred = (GitCredential*) credHandle;
+                switch (baseCred->credtype)
+                {
+                    case GitCredentialType.UserPassPlaintext:
+                        cred = UsernamePasswordCredentials.FromNative((GitCredentialUserpass*) credHandle);
+                        return 0;
+                    case GitCredentialType.Default:
+                        cred = new DefaultCredentials();
+                        return 0;
+                    default:
+                        throw new InvalidOperationException("User returned an unkown credential type");
+                }
+            }
+        }
+
+        /// <summary>
+        /// libgit2 will call an action back with a null url to indicate that
+        /// it should re-use the prior url; store the url so that we can replay.
+        /// </summary>
+        private string LastActionUrl { get; set; }
+
         /// <summary>
         /// Invoked by libgit2 to create a connection using this subtransport.
         /// </summary>
@@ -122,43 +227,57 @@ namespace LibGit2Sharp
                 SmartSubtransport t = GCHandle.FromIntPtr(Marshal.ReadIntPtr(subtransport, GitSmartSubtransport.GCHandleOffset)).Target as SmartSubtransport;
                 String urlAsString = LaxUtf8Marshaler.FromNative(url);
 
-                if (null != t &&
-                    !String.IsNullOrEmpty(urlAsString))
+                if (t == null)
                 {
-                    try
-                    {
-                        stream = t.Action(urlAsString, action).GitSmartTransportStreamPointer;
-
-                        return 0;
-                    }
-                    catch (Exception ex)
-                    {
-                        Proxy.giterr_set_str(GitErrorCategory.Net, ex);
-                    }
+                    Proxy.git_error_set_str(GitErrorCategory.Net, "no subtransport provided");
+                    return (int)GitErrorCode.Error;
                 }
 
-                return (int)GitErrorCode.Error;
+                if (String.IsNullOrEmpty(urlAsString))
+                {
+                    urlAsString = t.LastActionUrl;
+                }
+
+                if (String.IsNullOrEmpty(urlAsString))
+                {
+                    Proxy.git_error_set_str(GitErrorCategory.Net, "no url provided");
+                    return (int)GitErrorCode.Error;
+                }
+
+                try
+                {
+                    stream = t.Action(urlAsString, action).GitSmartTransportStreamPointer;
+                    t.LastActionUrl = urlAsString;
+                    return 0;
+                }
+                catch (Exception ex)
+                {
+                    Proxy.git_error_set_str(GitErrorCategory.Net, ex);
+                    return (int)GitErrorCode.Error;
+                }
             }
 
             private static int Close(IntPtr subtransport)
             {
                 SmartSubtransport t = GCHandle.FromIntPtr(Marshal.ReadIntPtr(subtransport, GitSmartSubtransport.GCHandleOffset)).Target as SmartSubtransport;
 
-                if (null != t)
+                if (t == null)
                 {
-                    try
-                    {
-                        t.Close();
-
-                        return 0;
-                    }
-                    catch (Exception ex)
-                    {
-                        Proxy.giterr_set_str(GitErrorCategory.Net, ex);
-                    }
+                    Proxy.git_error_set_str(GitErrorCategory.Net, "no subtransport provided");
+                    return (int)GitErrorCode.Error;
                 }
 
-                return (int)GitErrorCode.Error;
+                try
+                {
+                    t.Close();
+
+                    return 0;
+                }
+                catch (Exception ex)
+                {
+                    Proxy.git_error_set_str(GitErrorCategory.Net, ex);
+                    return (int)GitErrorCode.Error;
+                }
             }
 
             private static void Free(IntPtr subtransport)
@@ -173,7 +292,7 @@ namespace LibGit2Sharp
                     }
                     catch (Exception ex)
                     {
-                        Proxy.giterr_set_str(GitErrorCategory.Net, ex);
+                        Proxy.git_error_set_str(GitErrorCategory.Net, ex);
                     }
                 }
             }

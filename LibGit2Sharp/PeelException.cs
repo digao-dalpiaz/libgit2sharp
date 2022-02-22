@@ -9,7 +9,7 @@ namespace LibGit2Sharp
     /// target type due to the object model.
     /// </summary>
     [Serializable]
-    public class PeelException : LibGit2SharpException
+    public class PeelException : NativeException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="PeelException"/> class.
@@ -23,6 +23,15 @@ namespace LibGit2Sharp
         /// <param name="message">A message that describes the error.</param>
         public PeelException(string message)
             : base(message)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PeelException"/> class with a specified error message.
+        /// </summary>
+        /// <param name="format">A composite format string for use in <see cref="String.Format(IFormatProvider, string, object[])"/>.</param>
+        /// <param name="args">An object array that contains zero or more objects to format.</param>
+        public PeelException(string format, params object[] args)
+            : base(format, args)
         { }
 
         /// <summary>
@@ -43,8 +52,16 @@ namespace LibGit2Sharp
             : base(info, context)
         { }
 
-        internal PeelException(string message, GitErrorCode code, GitErrorCategory category)
-            : base(message, code, category)
+        internal PeelException(string message, GitErrorCategory category)
+            : base(message, category)
         { }
+
+        internal override GitErrorCode ErrorCode
+        {
+            get
+            {
+                return GitErrorCode.Peel;
+            }
+        }
     }
 }

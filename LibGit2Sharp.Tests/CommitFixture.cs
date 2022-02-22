@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using LibGit2Sharp.Core;
 using LibGit2Sharp.Tests.TestHelpers;
 using Xunit;
@@ -34,11 +35,11 @@ namespace LibGit2Sharp.Tests
                 repo.Reset(ResetMode.Hard);
                 repo.RemoveUntrackedFiles();
 
-                repo.Checkout("test");
+                Commands.Checkout(repo, "test");
                 Assert.Equal(2, repo.Commits.Count());
                 Assert.Equal("e90810b8df3e80c413d903f631643c716887138d", repo.Commits.First().Id.Sha);
 
-                repo.Checkout("master");
+                Commands.Checkout(repo, "master");
                 Assert.Equal(9, repo.Commits.Count());
                 Assert.Equal("32eab9cb1f450b5fe7ab663462b77d7f4b703344", repo.Commits.First().Id.Sha);
             }
@@ -69,7 +70,7 @@ namespace LibGit2Sharp.Tests
                 ObjectId parentOfHead = repo.Head.Tip.Parents.First().Id;
 
                 repo.Refs.Add("HEAD", parentOfHead.Sha, true);
-                Assert.Equal(true, repo.Info.IsHeadDetached);
+                Assert.True(repo.Info.IsHeadDetached);
 
                 Assert.Equal(6, repo.Commits.Count());
             }
@@ -155,7 +156,7 @@ namespace LibGit2Sharp.Tests
                                                                     }))
                 {
                     Assert.NotNull(commit);
-                    Assert.True(commit.Sha.StartsWith(reversedShas[count]));
+                    Assert.StartsWith(reversedShas[count], commit.Sha);
                     count++;
                 }
             }
@@ -203,7 +204,7 @@ namespace LibGit2Sharp.Tests
             string path = SandboxBareTestRepo();
             using (var repo = new Repository(path))
             {
-                Assert.Equal(1, repo.Commits.First().Parents.Count());
+                Assert.Single(repo.Commits.First().Parents);
             }
         }
 
@@ -221,7 +222,7 @@ namespace LibGit2Sharp.Tests
                                                                     }))
                 {
                     Assert.NotNull(commit);
-                    Assert.True(commit.Sha.StartsWith(expectedShas[count]));
+                    Assert.StartsWith(expectedShas[count], commit.Sha);
                     count++;
                 }
             }
@@ -274,7 +275,7 @@ namespace LibGit2Sharp.Tests
                 repoClone.RemoveUntrackedFiles();
 
                 string headSha = repoClone.Head.Tip.Sha;
-                repoClone.Checkout(headSha);
+                Commands.Checkout(repoClone, headSha);
 
                 AssertEnumerationOfCommitsInRepo(repoClone,
                     repo => new CommitFilter { IncludeReachableFrom = repo.Head },
@@ -474,16 +475,16 @@ namespace LibGit2Sharp.Tests
                 Assert.NotNull(commit.Author);
                 Assert.Equal("Scott Chacon", commit.Author.Name);
                 Assert.Equal("schacon@gmail.com", commit.Author.Email);
-                Assert.Equal(1273360386, commit.Author.When.ToSecondsSinceEpoch());
+                Assert.Equal(1273360386, commit.Author.When.ToUnixTimeSeconds());
 
                 Assert.NotNull(commit.Committer);
                 Assert.Equal("Scott Chacon", commit.Committer.Name);
                 Assert.Equal("schacon@gmail.com", commit.Committer.Email);
-                Assert.Equal(1273360386, commit.Committer.When.ToSecondsSinceEpoch());
+                Assert.Equal(1273360386, commit.Committer.When.ToUnixTimeSeconds());
 
                 Assert.Equal("181037049a54a1eb5fab404658a3a250b44335d7", commit.Tree.Sha);
 
-                Assert.Equal(0, commit.Parents.Count());
+                Assert.Empty(commit.Parents);
             }
         }
 
@@ -542,21 +543,20 @@ namespace LibGit2Sharp.Tests
         public void CanCommitWithSignatureFromConfig()
         {
             string repoPath = InitNewRepository();
-            string configPath = CreateConfigurationWithDummyUser(Constants.Identity);
-            var options = new RepositoryOptions { GlobalConfigurationLocation = configPath };
 
-            using (var repo = new Repository(repoPath, options))
+            using (var repo = new Repository(repoPath))
             {
+                CreateConfigurationWithDummyUser(repo, Constants.Identity);
                 string dir = repo.Info.Path;
                 Assert.True(Path.IsPathRooted(dir));
                 Assert.True(Directory.Exists(dir));
 
                 const string relativeFilepath = "new.txt";
                 string filePath = Touch(repo.Info.WorkingDirectory, relativeFilepath, "null");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 File.AppendAllText(filePath, "token\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 Assert.Null(repo.Head[relativeFilepath]);
 
@@ -590,8 +590,8 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(CurrentOperation.None, repo.Info.CurrentOperation);
 
                 Assert.Equal(2, newMergedCommit.Parents.Count());
-                Assert.Equal(newMergedCommit.Parents.First().Sha, "c47800c7266a2be04c571c04d5a6614691ea99bd");
-                Assert.Equal(newMergedCommit.Parents.Skip(1).First().Sha, "9fd738e8f7967c078dceed8190330fc8648ee56a");
+                Assert.Equal("c47800c7266a2be04c571c04d5a6614691ea99bd", newMergedCommit.Parents.First().Sha);
+                Assert.Equal("9fd738e8f7967c078dceed8190330fc8648ee56a", newMergedCommit.Parents.Skip(1).First().Sha);
 
                 // Assert reflog entry is created
                 var reflogEntry = repo.Refs.Log(repo.Refs.Head).First();
@@ -615,7 +615,7 @@ namespace LibGit2Sharp.Tests
 
                 const string relativeFilepath = "new.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "this is a new file");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 string mergeHeadPath = Touch(repo.Info.Path, "MERGE_HEAD", "abcdefabcdefabcdefabcdefabcdefabcdefabcd");
                 string mergeMsgPath = Touch(repo.Info.Path, "MERGE_MSG", "This is a dummy merge.\n");
@@ -652,9 +652,9 @@ namespace LibGit2Sharp.Tests
 
                 const string relativeFilepath = "new.txt";
                 string filePath = Touch(repo.Info.WorkingDirectory, relativeFilepath, "null");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
                 File.AppendAllText(filePath, "token\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 Assert.Null(repo.Head[relativeFilepath]);
 
@@ -670,11 +670,11 @@ namespace LibGit2Sharp.Tests
                 AssertBlobContent(repo.Head[relativeFilepath], "nulltoken\n");
                 AssertBlobContent(commit[relativeFilepath], "nulltoken\n");
 
-                Assert.Equal(0, commit.Parents.Count());
+                Assert.Empty(commit.Parents);
                 Assert.False(repo.Info.IsHeadUnborn);
 
                 // Assert a reflog entry is created on HEAD
-                Assert.Equal(1, repo.Refs.Log("HEAD").Count());
+                Assert.Single(repo.Refs.Log("HEAD"));
                 var reflogEntry = repo.Refs.Log("HEAD").First();
 
                 Assert.Equal(identity.Name, reflogEntry.Committer.Name);
@@ -689,11 +689,11 @@ namespace LibGit2Sharp.Tests
 
                 // Assert a reflog entry is created on HEAD target
                 var targetCanonicalName = repo.Refs.Head.TargetIdentifier;
-                Assert.Equal(1, repo.Refs.Log(targetCanonicalName).Count());
+                Assert.Single(repo.Refs.Log(targetCanonicalName));
                 Assert.Equal(commit.Id, repo.Refs.Log(targetCanonicalName).First().To);
 
                 File.WriteAllText(filePath, "nulltoken commits!\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 var author2 = new Signature(author.Name, author.Email, author.When.AddSeconds(5));
                 Commit commit2 = repo.Commit("Are you trying to fork me?", author2, author2);
@@ -701,7 +701,7 @@ namespace LibGit2Sharp.Tests
                 AssertBlobContent(repo.Head[relativeFilepath], "nulltoken commits!\n");
                 AssertBlobContent(commit2[relativeFilepath], "nulltoken commits!\n");
 
-                Assert.Equal(1, commit2.Parents.Count());
+                Assert.Single(commit2.Parents);
                 Assert.Equal(commit.Id, commit2.Parents.First().Id);
 
                 // Assert the reflog is shifted
@@ -709,19 +709,19 @@ namespace LibGit2Sharp.Tests
                 Assert.Equal(reflogEntry.To, repo.Refs.Log("HEAD").First().From);
 
                 Branch firstCommitBranch = repo.CreateBranch("davidfowl-rules", commit);
-                repo.Checkout(firstCommitBranch);
+                Commands.Checkout(repo, firstCommitBranch);
 
                 File.WriteAllText(filePath, "davidfowl commits!\n");
 
                 var author3 = new Signature("David Fowler", "david.fowler@microsoft.com", author.When.AddSeconds(2));
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 Commit commit3 = repo.Commit("I'm going to branch you backwards in time!", author3, author3);
 
                 AssertBlobContent(repo.Head[relativeFilepath], "davidfowl commits!\n");
                 AssertBlobContent(commit3[relativeFilepath], "davidfowl commits!\n");
 
-                Assert.Equal(1, commit3.Parents.Count());
+                Assert.Single(commit3.Parents);
                 Assert.Equal(commit.Id, commit3.Parents.First().Id);
 
                 AssertBlobContent(firstCommitBranch[relativeFilepath], "nulltoken\n");
@@ -740,7 +740,7 @@ namespace LibGit2Sharp.Tests
             {
                 const string relativeFilepath = "test.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "test\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 var author = new Signature("nulltoken", "emeric.fermas@gmail.com", DateTimeOffset.Parse("Wed, Dec 14 2011 08:29:03 +0100"));
                 repo.Commit("Initial commit", author, author);
@@ -776,17 +776,17 @@ namespace LibGit2Sharp.Tests
 
             using (var repo = new Repository(repoPath))
             {
-                Assert.Equal(1, repo.Head.Commits.Count());
+                Assert.Single(repo.Head.Commits);
 
                 Commit originalCommit = repo.Head.Tip;
-                Assert.Equal(0, originalCommit.Parents.Count());
+                Assert.Empty(originalCommit.Parents);
 
                 CreateAndStageANewFile(repo);
 
                 Commit amendedCommit = repo.Commit("I'm rewriting the history!", Constants.Signature, Constants.Signature,
                     new CommitOptions { AmendPreviousCommit = true });
 
-                Assert.Equal(1, repo.Head.Commits.Count());
+                Assert.Single(repo.Head.Commits);
 
                 AssertCommitHasBeenAmended(repo, amendedCommit, originalCommit);
             }
@@ -826,7 +826,7 @@ namespace LibGit2Sharp.Tests
         {
             string relativeFilepath = string.Format("new-file-{0}.txt", Path.GetRandomFileName());
             Touch(repo.Info.WorkingDirectory, relativeFilepath, "brand new content\n");
-            repo.Stage(relativeFilepath);
+            Commands.Stage(repo, relativeFilepath);
         }
 
         private static void AssertCommitHasBeenAmended(IRepository repo, Commit amendedCommit, Commit originalCommit)
@@ -889,9 +889,9 @@ namespace LibGit2Sharp.Tests
             using (var repo = new Repository(path))
             {
                 var author = new Signature("Wilbert van Dolleweerd", "getit@xs4all.nl",
-                                           Epoch.ToDateTimeOffset(1244187936, 120));
+                                           DateTimeOffset.FromUnixTimeSeconds(1244187936).ToOffset(TimeSpan.FromMinutes(120)));
                 var committer = new Signature("Henk Westhuis", "Henk_Westhuis@hotmail.com",
-                                           Epoch.ToDateTimeOffset(1244286496, 120));
+                                           DateTimeOffset.FromUnixTimeSeconds(1244286496).ToOffset(TimeSpan.FromMinutes(120)));
 
                 Commit c = repo.Commit("I can haz an author and a committer!", author, committer);
 
@@ -915,10 +915,10 @@ namespace LibGit2Sharp.Tests
 
                 const string relativeFilepath = "test.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "test\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 repo.Commit("Initial commit", Constants.Signature, Constants.Signature);
-                Assert.Equal(1, repo.Head.Commits.Count());
+                Assert.Single(repo.Head.Commits);
             }
         }
 
@@ -1000,8 +1000,8 @@ namespace LibGit2Sharp.Tests
                 Commit newMergedCommit = repo.Commit("Merge commit", Constants.Signature, Constants.Signature);
 
                 Assert.Equal(2, newMergedCommit.Parents.Count());
-                Assert.Equal(newMergedCommit.Parents.First().Sha, "32eab9cb1f450b5fe7ab663462b77d7f4b703344");
-                Assert.Equal(newMergedCommit.Parents.Skip(1).First().Sha, "f705abffe7015f2beacf2abe7a36583ebee3487e");
+                Assert.Equal("32eab9cb1f450b5fe7ab663462b77d7f4b703344", newMergedCommit.Parents.First().Sha);
+                Assert.Equal("f705abffe7015f2beacf2abe7a36583ebee3487e", newMergedCommit.Parents.Skip(1).First().Sha);
             }
         }
 
@@ -1031,19 +1031,142 @@ namespace LibGit2Sharp.Tests
             using (var repo = new Repository(repoPath))
             {
                 Touch(repo.Info.WorkingDirectory, "test.txt", "test\n");
-                repo.Stage("test.txt");
+                Commands.Stage(repo, "test.txt");
 
                 repo.Commit("Initial commit", Constants.Signature, Constants.Signature);
 
                 Touch(repo.Info.WorkingDirectory, "new.txt", "content\n");
-                repo.Stage("new.txt");
+                Commands.Stage(repo, "new.txt");
 
                 repo.Commit("One commit", Constants.Signature, Constants.Signature);
 
-                repo.Remove("new.txt");
+                Commands.Remove(repo, "new.txt");
 
                 Assert.Throws<EmptyCommitException>(() => repo.Commit("Oops", Constants.Signature, Constants.Signature,
                     new CommitOptions { AmendPreviousCommit = true }));
+            }
+        }
+
+        [Fact]
+        public void CanPrettifyAMessage()
+        {
+            string input = "# Comment\nA line that will remain\n# And another character\n\n\n";
+            string expected = "A line that will remain\n";
+
+            Assert.Equal(expected, Commit.PrettifyMessage(input, '#'));
+            Assert.Equal(expected, Commit.PrettifyMessage(input.Replace('#', ';'), ';'));
+        }
+
+        private readonly string signedCommit =
+            "tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904\n" +
+            "parent 8496071c1b46c854b31185ea97743be6a8774479\n" +
+            "author Ben Burkert <ben@benburkert.com> 1358451456 -0800\n" +
+            "committer Ben Burkert <ben@benburkert.com> 1358451456 -0800\n" +
+            "gpgsig -----BEGIN PGP SIGNATURE-----\n" +
+            " Version: GnuPG v1.4.12 (Darwin)\n" +
+            " \n" +
+            " iQIcBAABAgAGBQJQ+FMIAAoJEH+LfPdZDSs1e3EQAJMjhqjWF+WkGLHju7pTw2al\n" +
+            " o6IoMAhv0Z/LHlWhzBd9e7JeCnanRt12bAU7yvYp9+Z+z+dbwqLwDoFp8LVuigl8\n" +
+            " JGLcnwiUW3rSvhjdCp9irdb4+bhKUnKUzSdsR2CK4/hC0N2i/HOvMYX+BRsvqweq\n" +
+            " AsAkA6dAWh+gAfedrBUkCTGhlNYoetjdakWqlGL1TiKAefEZrtA1TpPkGn92vbLq\n" +
+            " SphFRUY9hVn1ZBWrT3hEpvAIcZag3rTOiRVT1X1flj8B2vGCEr3RrcwOIZikpdaW\n" +
+            " who/X3xh/DGbI2RbuxmmJpxxP/8dsVchRJJzBwG+yhwU/iN3MlV2c5D69tls/Dok\n" +
+            " 6VbyU4lm/ae0y3yR83D9dUlkycOnmmlBAHKIZ9qUts9X7mWJf0+yy2QxJVpjaTGG\n" +
+            " cmnQKKPeNIhGJk2ENnnnzjEve7L7YJQF6itbx5VCOcsGh3Ocb3YR7DMdWjt7f8pu\n" +
+            " c6j+q1rP7EpE2afUN/geSlp5i3x8aXZPDj67jImbVCE/Q1X9voCtyzGJH7MXR0N9\n" +
+            " ZpRF8yzveRfMH8bwAJjSOGAFF5XkcR/RNY95o+J+QcgBLdX48h+ZdNmUf6jqlu3J\n" +
+            " 7KmTXXQcOVpN6dD3CmRFsbjq+x6RHwa8u1iGn+oIkX908r97ckfB/kHKH7ZdXIJc\n" +
+            " cpxtDQQMGYFpXK/71stq\n" +
+            " =ozeK\n" +
+            " -----END PGP SIGNATURE-----\n" +
+            "\n" +
+            "a simple commit which works\n";
+
+        private readonly string signatureData =
+            "-----BEGIN PGP SIGNATURE-----\n" +
+            "Version: GnuPG v1.4.12 (Darwin)\n" +
+            "\n" +
+            "iQIcBAABAgAGBQJQ+FMIAAoJEH+LfPdZDSs1e3EQAJMjhqjWF+WkGLHju7pTw2al\n" +
+            "o6IoMAhv0Z/LHlWhzBd9e7JeCnanRt12bAU7yvYp9+Z+z+dbwqLwDoFp8LVuigl8\n" +
+            "JGLcnwiUW3rSvhjdCp9irdb4+bhKUnKUzSdsR2CK4/hC0N2i/HOvMYX+BRsvqweq\n" +
+            "AsAkA6dAWh+gAfedrBUkCTGhlNYoetjdakWqlGL1TiKAefEZrtA1TpPkGn92vbLq\n" +
+            "SphFRUY9hVn1ZBWrT3hEpvAIcZag3rTOiRVT1X1flj8B2vGCEr3RrcwOIZikpdaW\n" +
+            "who/X3xh/DGbI2RbuxmmJpxxP/8dsVchRJJzBwG+yhwU/iN3MlV2c5D69tls/Dok\n" +
+            "6VbyU4lm/ae0y3yR83D9dUlkycOnmmlBAHKIZ9qUts9X7mWJf0+yy2QxJVpjaTGG\n" +
+            "cmnQKKPeNIhGJk2ENnnnzjEve7L7YJQF6itbx5VCOcsGh3Ocb3YR7DMdWjt7f8pu\n" +
+            "c6j+q1rP7EpE2afUN/geSlp5i3x8aXZPDj67jImbVCE/Q1X9voCtyzGJH7MXR0N9\n" +
+            "ZpRF8yzveRfMH8bwAJjSOGAFF5XkcR/RNY95o+J+QcgBLdX48h+ZdNmUf6jqlu3J\n" +
+            "7KmTXXQcOVpN6dD3CmRFsbjq+x6RHwa8u1iGn+oIkX908r97ckfB/kHKH7ZdXIJc\n" +
+            "cpxtDQQMGYFpXK/71stq\n" +
+            "=ozeK\n" +
+            "-----END PGP SIGNATURE-----";
+
+        private readonly string signedData =
+            "tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904\n" +
+            "parent 8496071c1b46c854b31185ea97743be6a8774479\n" +
+            "author Ben Burkert <ben@benburkert.com> 1358451456 -0800\n" +
+            "committer Ben Burkert <ben@benburkert.com> 1358451456 -0800\n" +
+            "\n" +
+            "a simple commit which works\n";
+
+        [Fact]
+        public void CanExtractSignatureFromCommit()
+        {
+            string repoPath = InitNewRepository();
+            using (var repo = new Repository(repoPath))
+            {
+                var odb = repo.ObjectDatabase;
+                var signedId = odb.Write<Commit>(Encoding.UTF8.GetBytes(signedCommit));
+
+                // Look up the commit to make sure we wrote something valid
+                var commit = repo.Lookup<Commit>(signedId);
+                Assert.Equal("a simple commit which works\n", commit.Message);
+
+                var signatureInfo = Commit.ExtractSignature(repo, signedId, "gpgsig");
+                Assert.Equal(signedData, signatureInfo.SignedData);
+                Assert.Equal(signatureData, signatureInfo.Signature);
+
+                signatureInfo = Commit.ExtractSignature(repo, signedId);
+                Assert.Equal(signedData, signatureInfo.SignedData);
+                Assert.Equal(signatureData, signatureInfo.Signature);
+            }
+        }
+
+        [Fact]
+        public void CanCreateACommitString()
+        {
+            string repoPath = SandboxStandardTestRepo();
+            using (var repo = new Repository(repoPath))
+            {
+                var tipCommit = repo.Head.Tip;
+                var recreatedCommit = Commit.CreateBuffer(
+                    tipCommit.Author,
+                    tipCommit.Committer,
+                    tipCommit.Message,
+                    tipCommit.Tree,
+                    tipCommit.Parents,
+                    false, null);
+
+                var recreatedId = repo.ObjectDatabase.Write<Commit>(Encoding.UTF8.GetBytes(recreatedCommit));
+                Assert.Equal(tipCommit.Id, recreatedId);
+            }
+        }
+
+        [Fact]
+        public void CanCreateASignedCommit()
+        {
+            string repoPath = SandboxStandardTestRepo();
+            using (var repo = new Repository(repoPath))
+            {
+                var odb = repo.ObjectDatabase;
+                var signedId = odb.Write<Commit>(Encoding.UTF8.GetBytes(signedCommit));
+                var signedId2 = odb.CreateCommitWithSignature(signedData, signatureData);
+
+                Assert.Equal(signedId, signedId2);
+
+                var signatureInfo = Commit.ExtractSignature(repo, signedId2);
+                Assert.Equal(signedData, signatureInfo.SignedData);
+                Assert.Equal(signatureData, signatureInfo.Signature);
             }
         }
     }

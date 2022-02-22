@@ -18,7 +18,7 @@ namespace LibGit2Sharp.Core
     {
         private static readonly LaxFilePathNoCleanupMarshaler staticInstance = new LaxFilePathNoCleanupMarshaler();
 
-        public new static ICustomMarshaler GetInstance(String cookie)
+        public new static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -50,7 +50,7 @@ namespace LibGit2Sharp.Core
     {
         private static readonly StrictFilePathMarshaler staticInstance = new StrictFilePathMarshaler();
 
-        public new static ICustomMarshaler GetInstance(String cookie)
+        public new static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -70,7 +70,7 @@ namespace LibGit2Sharp.Core
             {
                 throw new MarshalDirectiveException(string.Format(CultureInfo.InvariantCulture,
                                                     "{0} must be used on a FilePath.",
-                                                    GetType().Name));
+                                                    this.GetType().Name));
             }
 
             return FromManaged(filePath);
@@ -98,7 +98,7 @@ namespace LibGit2Sharp.Core
     {
         private static readonly LaxFilePathMarshaler staticInstance = new LaxFilePathMarshaler();
 
-        public new static ICustomMarshaler GetInstance(String cookie)
+        public new static ICustomMarshaler GetInstance(string cookie)
         {
             return staticInstance;
         }
@@ -115,6 +115,11 @@ namespace LibGit2Sharp.Core
         public new static FilePath FromNative(IntPtr pNativeData)
         {
             return LaxUtf8Marshaler.FromNative(pNativeData);
+        }
+
+        public new static unsafe FilePath FromNative(char* buffer)
+        {
+            return LaxUtf8Marshaler.FromNative(buffer);
         }
 
         public new static FilePath FromBuffer(byte[] buffer)

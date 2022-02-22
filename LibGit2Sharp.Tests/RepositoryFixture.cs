@@ -27,6 +27,7 @@ namespace LibGit2Sharp.Tests
                 Assert.Null(repo.Info.WorkingDirectory);
                 Assert.Equal(Path.GetFullPath(repoPath), repo.Info.Path);
                 Assert.True(repo.Info.IsBare);
+                Assert.Throws<BareRepositoryException>(() => { var idx = repo.Index; });
 
                 AssertInitializedRepository(repo, "refs/heads/master");
 
@@ -122,7 +123,7 @@ namespace LibGit2Sharp.Tests
                 Assert.True(Repository.IsValid(repo.Info.WorkingDirectory));
                 Assert.True(Repository.IsValid(repo.Info.Path));
 
-                Assert.Equal(false, repo.Info.IsBare);
+                Assert.False(repo.Info.IsBare);
 
                 char sep = Path.DirectorySeparatorChar;
                 Assert.Equal(scd1.RootedDirectoryPath + sep, repo.Info.WorkingDirectory);
@@ -147,7 +148,7 @@ namespace LibGit2Sharp.Tests
                 Assert.True(Repository.IsValid(repo.Info.WorkingDirectory));
                 Assert.True(Repository.IsValid(repo.Info.Path));
 
-                Assert.Equal(false, repo.Info.IsBare);
+                Assert.False(repo.Info.IsBare);
 
                 char sep = Path.DirectorySeparatorChar;
                 Assert.Equal(scd1.RootedDirectoryPath + sep, repo.Info.WorkingDirectory);
@@ -166,6 +167,10 @@ namespace LibGit2Sharp.Tests
 
         private static void AssertIsHidden(string repoPath)
         {
+            //Workaround for .NET Core 1.x never considering a directory hidden if the path has a trailing slash
+            //https://github.com/dotnet/corefx/issues/18520
+            repoPath = repoPath.TrimEnd('/');
+
             FileAttributes attribs = File.GetAttributes(repoPath);
 
             Assert.Equal(FileAttributes.Hidden, (attribs & FileAttributes.Hidden));
@@ -181,7 +186,7 @@ namespace LibGit2Sharp.Tests
 
             using (var repo = new Repository(repoPath))
             {
-                Remote remote = repo.Network.Remotes.Add(remoteName, url);
+                repo.Network.Remotes.Add(remoteName, url);
 
                 // We will first fetch without specifying any Tag options.
                 // After we verify this fetch, we will perform a second fetch
@@ -208,13 +213,13 @@ namespace LibGit2Sharp.Tests
                 }
 
                 // Perform the actual fetch
-                repo.Fetch(remote.Name, new FetchOptions { OnUpdateTips = expectedFetchState.RemoteUpdateTipsHandler });
+                Commands.Fetch(repo, remoteName, new string[0], new FetchOptions { OnUpdateTips = expectedFetchState.RemoteUpdateTipsHandler }, null);
 
                 // Verify the expected state
                 expectedFetchState.CheckUpdatedReferences(repo);
 
                 // Now fetch the rest of the tags
-                repo.Fetch(remote.Name, new FetchOptions { TagFetchMode = TagFetchMode.All });
+                Commands.Fetch(repo, remoteName, new string[0], new FetchOptions { TagFetchMode = TagFetchMode.All }, null);
 
                 // Verify that the "nearly-dangling" tag is now in the repo.
                 Tag nearlyDanglingTag = repo.Tags["nearly-dangling"];
@@ -262,18 +267,18 @@ namespace LibGit2Sharp.Tests
             Assert.Equal(headRef.TargetIdentifier, repo.Head.CanonicalName);
             Assert.Null(repo.Head.Tip);
 
-            Assert.Equal(0, repo.Commits.Count());
-            Assert.Equal(0, repo.Commits.QueryBy(new CommitFilter()).Count());
-            Assert.Equal(0, repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = repo.Refs.Head }).Count());
-            Assert.Equal(0, repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = repo.Head }).Count());
-            Assert.Equal(0, repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = "HEAD" }).Count());
-            Assert.Equal(0, repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = expectedHeadTargetIdentifier }).Count());
+            Assert.Empty(repo.Commits);
+            Assert.Empty(repo.Commits.QueryBy(new CommitFilter()));
+            Assert.Empty(repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = repo.Refs.Head }));
+            Assert.Empty(repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = repo.Head }));
+            Assert.Empty(repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = "HEAD" }));
+            Assert.Empty(repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = expectedHeadTargetIdentifier }));
 
             Assert.Null(repo.Head["subdir/I-do-not-exist"]);
 
-            Assert.Equal(0, repo.Branches.Count());
-            Assert.Equal(0, repo.Refs.Count());
-            Assert.Equal(0, repo.Tags.Count());
+            Assert.Empty(repo.Branches);
+            Assert.Empty(repo.Refs);
+            Assert.Empty(repo.Tags);
         }
 
         [Fact]
@@ -443,7 +448,7 @@ namespace LibGit2Sharp.Tests
             {
                 const string filename = "new.txt";
                 Touch(repo.Info.WorkingDirectory, filename, "one ");
-                repo.Stage(filename);
+                Commands.Stage(repo, filename);
 
                 Signature author = Constants.Signature;
                 Commit commit = repo.Commit("Initial commit", author, author);
@@ -610,9 +615,9 @@ namespace LibGit2Sharp.Tests
             string path = SandboxStandardTestRepo();
             using (var repo = new Repository(path))
             {
-                repo.Checkout(repo.Head.Tip.Sha, new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force });
+                Commands.Checkout(repo, repo.Head.Tip.Sha, new CheckoutOptions() { CheckoutModifiers = CheckoutModifiers.Force });
                 Branch trackLocal = repo.Head;
-                Assert.Null(trackLocal.Remote);
+                Assert.Null(trackLocal.RemoteName);
             }
         }
 
@@ -673,6 +678,19 @@ namespace LibGit2Sharp.Tests
             }
         }
 
+        [Fact]
+        public void CanCreateInMemoryRepository()
+        {
+            using (var repo = new Repository())
+            {
+                Assert.True(repo.Info.IsBare);
+                Assert.Null(repo.Info.Path);
+                Assert.Null(repo.Info.WorkingDirectory);
+
+                Assert.Throws<BareRepositoryException>(() => { var idx = repo.Index; });
+            }
+        }
+
         [SkippableFact]
         public void CanListRemoteReferencesWithCredentials()
         {
@@ -718,7 +736,7 @@ namespace LibGit2Sharp.Tests
             using (var originalRepo = new Repository(originalRepoPath))
             {
                 detachedHeadSha = originalRepo.Head.Tip.Sha;
-                originalRepo.Checkout(detachedHeadSha);
+                Commands.Checkout(originalRepo, detachedHeadSha);
 
                 Assert.True(originalRepo.Info.IsHeadDetached);
             }

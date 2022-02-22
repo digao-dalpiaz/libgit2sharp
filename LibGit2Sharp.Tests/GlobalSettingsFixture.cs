@@ -1,4 +1,8 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.IO;
+using System.Reflection;
+using System.Text.RegularExpressions;
+using LibGit2Sharp.Core;
 using LibGit2Sharp.Tests.TestHelpers;
 using Xunit;
 
@@ -19,50 +23,89 @@ namespace LibGit2Sharp.Tests
         public void CanRetrieveValidVersionString()
         {
             // Version string format is:
-            //      Major.Minor.Patch[-preDateTime]-LibGit2Sharp_abbrev_hash-libgit2_abbrev_hash (x86|amd64 - features)
+            //      Major.Minor.Patch[-previewTag]+{LibGit2Sharp_abbrev_hash}.libgit2-{libgit2_abbrev_hash} (x86|x64 - features)
             // Example output:
-            //      "0.17.0[-pre20170914123547]-deadcafe-06d772d (x86 - Threads, Https)"
+            //      "0.25.0-preview.52+871d13a67f.libgit2-15e1193 (x86 - Threads, Https)"
 
             string versionInfo = GlobalSettings.Version.ToString();
 
             // The GlobalSettings.Version returned string should contain :
-            //      version: '0.17.0[-pre20170914123547]' LibGit2Sharp version number.
-            //      git2SharpHash:'unknown' ( when compiled from source ) else LibGit2Sharp library hash.
-            //      git2hash: '06d772d' LibGit2 library hash.
-            //      arch: 'x86' or 'amd64' LibGit2 target.
-            //      git2Features: 'Threads, Ssh' LibGit2 features compiled with.
-            string regex = @"^(?<version>\d{1,}\.\d{1,2}\.\d{1,3}(-(pre|dev)\d{14})?)-(?<git2SharpHash>\w+)-(?<git2Hash>\w+) \((?<arch>\w+) - (?<git2Features>(?:\w*(?:, )*\w+)*)\)$";
+            //      version: '0.25.0[-previewTag]' LibGit2Sharp version number.
+            //      git2SharpHash: '871d13a67f' LibGit2Sharp hash.
+            //      arch: 'x86' or 'x64' libgit2 target.
+            //      git2Features: 'Threads, Ssh' libgit2 features compiled with.
+            string regex = @"^(?<version>\d+\.\d+\.\d+(-[\w\-\.]+)?\+((?<git2SharpHash>[a-f0-9]{10})\.)?libgit2-[a-f0-9]{7}) \((?<arch>\w+) - (?<git2Features>(?:\w*(?:, )*\w+)*)\)$";
 
             Assert.NotNull(versionInfo);
 
             Match regexResult = Regex.Match(versionInfo, regex);
 
             Assert.True(regexResult.Success, "The following version string format is enforced:" +
-                                             "Major.Minor.Patch[-preDateTime]-LibGit2Sharp_abbrev_hash-libgit2_abbrev_hash (x86|amd64 - features)");
-
-            GroupCollection matchGroups = regexResult.Groups;
-
-            Assert.Equal(8, matchGroups.Count);
-
-            // Check that all groups are valid
-            for (int i = 0; i < matchGroups.Count; i++)
-            {
-                if (i == 1 || i == 2) // '-pre' segment is optional
-                {
-                    continue;
-                }
-
-                Assert.True(matchGroups[i].Success);
-            }
+                                             "Major.Minor.Patch[-previewTag]+{LibGit2Sharp_abbrev_hash}.libgit2-{libgit2_abbrev_hash} (x86|x64 - features). " +
+                                             "But found \"" + versionInfo + "\" instead.");
         }
 
         [Fact]
         public void TryingToResetNativeLibraryPathAfterLoadedThrows()
         {
             // Do something that loads the native library
-            Assert.NotNull(GlobalSettings.Version.Features);
+            var features = GlobalSettings.Version.Features;
 
             Assert.Throws<LibGit2SharpException>(() => { GlobalSettings.NativeLibraryPath = "C:/Foo"; });
+        }
+
+        [SkippableTheory]
+        [InlineData("x86")]
+        [InlineData("x64")]
+        public void LoadFromSpecifiedPath(string architecture)
+        {
+            Skip.IfNot(Platform.IsRunningOnNetFramework(), ".NET Framework only test.");
+
+            var nativeDllFileName = NativeDllName.Name + ".dll";
+            var testDir = Path.GetDirectoryName(typeof(GlobalSettingsFixture).Assembly.Location);
+            var testAppExe = Path.Combine(testDir, $"NativeLibraryLoadTestApp.{architecture}.exe");
+            var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            var platformDir = Path.Combine(tempDir, "plat", architecture);
+            var libraryPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "lib", "win32", architecture);
+
+            try
+            {
+                Directory.CreateDirectory(platformDir);
+                File.Copy(Path.Combine(libraryPath, nativeDllFileName), Path.Combine(platformDir, nativeDllFileName));
+
+                var (output, exitCode) = ProcessHelper.RunProcess(testAppExe, arguments: $@"{NativeDllName.Name} ""{platformDir}""", workingDirectory: tempDir);
+
+                Assert.Empty(output);
+                Assert.Equal(0, exitCode);
+            }
+            finally
+            {
+                DirectoryHelper.DeleteDirectory(tempDir);
+            }
+        }
+
+        [Fact]
+        public void SetExtensions()
+        {
+            var extensions = GlobalSettings.GetExtensions();
+
+            // Assert that "noop" is supported by default
+            Assert.Equal(new[] { "noop" }, extensions);
+
+            // Disable "noop" extensions
+            GlobalSettings.SetExtensions("!noop");
+            extensions = GlobalSettings.GetExtensions();
+            Assert.Empty(extensions);
+
+            // Enable two new extensions (it will reset the configuration and "noop" will be enabled)
+            GlobalSettings.SetExtensions("partialclone", "newext");
+            extensions = GlobalSettings.GetExtensions();
+            Assert.Equal(new[] { "noop", "partialclone", "newext" }, extensions);
+
+            // You can have multiple times the same extension
+            GlobalSettings.SetExtensions("noop", "test", "test" );
+            extensions = GlobalSettings.GetExtensions();
+            Assert.Equal(new[] { "noop", "noop", "test", "test" }, extensions);
         }
     }
 }

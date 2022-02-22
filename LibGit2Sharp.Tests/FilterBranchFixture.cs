@@ -191,10 +191,10 @@ namespace LibGit2Sharp.Tests
             AssertSucceedingButNotError();
 
             var lightweightTag = repo.Tags["so-lonely"];
-            Assert.Equal("Bam!\n", ((Commit)lightweightTag.Target).Message);
+            Assert.Equal("Bam!", ((Commit)lightweightTag.Target).Message);
 
             var annotatedTag = repo.Tags["so-lonely-but-annotated"];
-            Assert.Equal("Bam!\n", ((Commit)annotatedTag.Target).Message);
+            Assert.Equal("Bam!", ((Commit)annotatedTag.Target).Message);
         }
 
         [Fact]
@@ -366,7 +366,7 @@ namespace LibGit2Sharp.Tests
             var commit = repo.Branches["packed"].Tip;
             var parent = commit.Parents.Single();
 
-            Assert.True(parent.Sha.StartsWith("5001298"));
+            Assert.StartsWith("5001298", parent.Sha);
             Assert.NotEqual(Constants.Signature, commit.Author);
             Assert.NotEqual(Constants.Signature, parent.Author);
 
@@ -495,7 +495,7 @@ namespace LibGit2Sharp.Tests
             var parents = repo.Branches["br2"].Tip.Parents.ToList();
             Assert.Equal(2, parents.Count());
             Assert.NotEmpty(parents.Where(c => c.Sha.StartsWith("9fd738e")));
-            Assert.Equal("abc\n", parents.Single(c => !c.Sha.StartsWith("9fd738e")).Message);
+            Assert.Equal("abc", parents.Single(c => !c.Sha.StartsWith("9fd738e")).Message);
         }
 
         [Fact]
@@ -530,7 +530,7 @@ namespace LibGit2Sharp.Tests
             AssertErrorFired(ex);
             AssertSucceedingNotFired();
 
-            Assert.Equal("abc\n", repo.Head.Tip.Message);
+            Assert.Equal("abc", repo.Head.Tip.Message);
 
             var newOriginalRefs = repo.Refs.FromGlob("refs/original/*").OrderBy(r => r.CanonicalName).ToArray();
             Assert.Equal(originalRefs, newOriginalRefs);
@@ -557,7 +557,7 @@ namespace LibGit2Sharp.Tests
             AssertErrorFired(ex);
             AssertSucceedingNotFired();
 
-            Assert.Equal(0, repo.Refs.FromGlob("refs/original/*").Count());
+            Assert.Empty(repo.Refs.FromGlob("refs/original/*"));
         }
 
         // Graft the orphan "test" branch to the tip of "packed"
@@ -633,7 +633,7 @@ namespace LibGit2Sharp.Tests
             var commitToRewrite = repo.Lookup<Commit>("6dcf9bf");
             var newParent = repo.Branches["packed"].Tip;
 
-            Assert.True(newParent.Sha.StartsWith("41bc8c6"));
+            Assert.StartsWith("41bc8c6", newParent.Sha);
 
             repo.Refs.RewriteHistory(new RewriteHistoryOptions
             {
@@ -649,22 +649,22 @@ namespace LibGit2Sharp.Tests
             AssertSucceedingButNotError();
 
             // Assert "packed" hasn't been rewritten
-            Assert.True(repo.Branches["packed"].Tip.Sha.StartsWith("41bc8c6"));
+            Assert.StartsWith("41bc8c6", repo.Branches["packed"].Tip.Sha);
 
             // Assert (test, tag: lw, tag: e90810b, tag: test) have been rewritten
             var rewrittenTestCommit = repo.Branches["test"].Tip;
-            Assert.True(rewrittenTestCommit.Sha.StartsWith("f558880"));
+            Assert.StartsWith("f558880", rewrittenTestCommit.Sha);
             Assert.Equal(rewrittenTestCommit, repo.Lookup<Commit>("refs/tags/lw^{commit}"));
             Assert.Equal(rewrittenTestCommit, repo.Lookup<Commit>("refs/tags/e90810b^{commit}"));
             Assert.Equal(rewrittenTestCommit, repo.Lookup<Commit>("refs/tags/test^{commit}"));
 
             // Assert parent of rewritten commit
             var rewrittenTestCommitParent = rewrittenTestCommit.Parents.Single();
-            Assert.True(rewrittenTestCommitParent.Sha.StartsWith("0c25efa"));
+            Assert.StartsWith("0c25efa", rewrittenTestCommitParent.Sha);
 
             // Assert grand parent of rewritten commit
             var rewrittenTestCommitGrandParent = rewrittenTestCommitParent.Parents.Single();
-            Assert.True(rewrittenTestCommitGrandParent.Sha.StartsWith("41bc8c6"));
+            Assert.StartsWith("41bc8c6", rewrittenTestCommitGrandParent.Sha);
         }
 
         [Fact]
@@ -791,7 +791,7 @@ namespace LibGit2Sharp.Tests
             var newCommit = newAnnotationC.Target as Commit;
             Assert.NotNull(newCommit);
             Assert.NotEqual(newCommit, theCommit);
-            Assert.Equal("Rewrote\n", newCommit.Message);
+            Assert.Equal("Rewrote", newCommit.Message);
 
             // Ensure the original tag doesn't exist anymore
             Assert.Null(repo.Tags["lightweightA"]);

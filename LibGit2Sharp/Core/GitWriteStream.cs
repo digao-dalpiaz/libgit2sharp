@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace LibGit2Sharp.Core
 {
     [StructLayout(LayoutKind.Sequential)]
-    internal class GitWriteStream
+    internal struct GitWriteStream
     {
         [MarshalAs(UnmanagedType.FunctionPtr)]
         public write_fn write;
@@ -15,8 +15,13 @@ namespace LibGit2Sharp.Core
         [MarshalAs(UnmanagedType.FunctionPtr)]
         public free_fn free;
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int write_fn(IntPtr stream, IntPtr buffer, UIntPtr len);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate int close_fn(IntPtr stream);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void free_fn(IntPtr stream);
     }
 }

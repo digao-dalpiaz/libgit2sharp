@@ -10,54 +10,56 @@ namespace LibGit2Sharp.Tests
 {
     public class FileHistoryFixture : BaseFixture
     {
-        [Theory]
-        [InlineData("https://github.com/nulltoken/follow-test.git")]
-        public void CanDealWithFollowTest(string url)
-        {
-            var scd = BuildSelfCleaningDirectory();
-            var clonedRepoPath = Repository.Clone(url, scd.DirectoryPath);
+        //Looks like nulltoken deleted the repo this test was using
 
-            using (var repo = new Repository(clonedRepoPath))
-            {
-                // $ git log --follow --format=oneline so-renamed.txt
-                // 88f91835062161febb46fb270ef4188f54c09767 Update not-yet-renamed.txt AND rename into so-renamed.txt
-                // ef7cb6a63e32595fffb092cb1ae9a32310e58850 Add not-yet-renamed.txt
-                var fileHistoryEntries = repo.Commits.QueryBy("so-renamed.txt").ToList();
-                Assert.Equal(2, fileHistoryEntries.Count());
-                Assert.Equal("88f91835062161febb46fb270ef4188f54c09767", fileHistoryEntries[0].Commit.Sha);
-                Assert.Equal("ef7cb6a63e32595fffb092cb1ae9a32310e58850", fileHistoryEntries[1].Commit.Sha);
+        //[Theory]
+        //[InlineData("https://github.com/nulltoken/follow-test.git")]
+        //public void CanDealWithFollowTest(string url)
+        //{
+        //    var scd = BuildSelfCleaningDirectory();
+        //    var clonedRepoPath = Repository.Clone(url, scd.DirectoryPath);
 
-                // $ git log --follow --format=oneline untouched.txt
-                // c10c1d5f74b76f20386d18674bf63fbee6995061 Initial commit
-                fileHistoryEntries = repo.Commits.QueryBy("untouched.txt").ToList();
-                Assert.Equal(1, fileHistoryEntries.Count());
-                Assert.Equal("c10c1d5f74b76f20386d18674bf63fbee6995061", fileHistoryEntries[0].Commit.Sha);
+        //    using (var repo = new Repository(clonedRepoPath))
+        //    {
+        //        // $ git log --follow --format=oneline so-renamed.txt
+        //        // 88f91835062161febb46fb270ef4188f54c09767 Update not-yet-renamed.txt AND rename into so-renamed.txt
+        //        // ef7cb6a63e32595fffb092cb1ae9a32310e58850 Add not-yet-renamed.txt
+        //        var fileHistoryEntries = repo.Commits.QueryBy("so-renamed.txt").ToList();
+        //        Assert.Equal(2, fileHistoryEntries.Count());
+        //        Assert.Equal("88f91835062161febb46fb270ef4188f54c09767", fileHistoryEntries[0].Commit.Sha);
+        //        Assert.Equal("ef7cb6a63e32595fffb092cb1ae9a32310e58850", fileHistoryEntries[1].Commit.Sha);
 
-                // $ git log --follow --format=oneline under-test.txt
-                // 0b5b18f2feb917dee98df1210315b2b2b23c5bec Rename file renamed.txt into under-test.txt
-                // 49921d463420a892c9547a326632ef6a9ba3b225 Update file renamed.txt
-                // 70f636e8c64bbc2dfef3735a562bb7e195d8019f Rename file under-test.txt into renamed.txt
-                // d3868d57a6aaf2ae6ed4887d805ae4bc91d8ce4d Updated file under test
-                // 9da10ef7e139c49604a12caa866aae141f38b861 Updated file under test
-                // 599a5d821fb2c0a25855b4233e26d475c2fbeb34 Updated file under test
-                // 678b086b44753000567aa64344aa0d8034fa0083 Updated file under test
-                // 8f7d9520f306771340a7c79faea019ad18e4fa1f Updated file under test
-                // bd5f8ee279924d33be8ccbde82e7f10b9d9ff237 Updated file under test
-                // c10c1d5f74b76f20386d18674bf63fbee6995061 Initial commit
-                fileHistoryEntries = repo.Commits.QueryBy("under-test.txt").ToList();
-                Assert.Equal(10, fileHistoryEntries.Count());
-                Assert.Equal("0b5b18f2feb917dee98df1210315b2b2b23c5bec", fileHistoryEntries[0].Commit.Sha);
-                Assert.Equal("49921d463420a892c9547a326632ef6a9ba3b225", fileHistoryEntries[1].Commit.Sha);
-                Assert.Equal("70f636e8c64bbc2dfef3735a562bb7e195d8019f", fileHistoryEntries[2].Commit.Sha);
-                Assert.Equal("d3868d57a6aaf2ae6ed4887d805ae4bc91d8ce4d", fileHistoryEntries[3].Commit.Sha);
-                Assert.Equal("9da10ef7e139c49604a12caa866aae141f38b861", fileHistoryEntries[4].Commit.Sha);
-                Assert.Equal("599a5d821fb2c0a25855b4233e26d475c2fbeb34", fileHistoryEntries[5].Commit.Sha);
-                Assert.Equal("678b086b44753000567aa64344aa0d8034fa0083", fileHistoryEntries[6].Commit.Sha);
-                Assert.Equal("8f7d9520f306771340a7c79faea019ad18e4fa1f", fileHistoryEntries[7].Commit.Sha);
-                Assert.Equal("bd5f8ee279924d33be8ccbde82e7f10b9d9ff237", fileHistoryEntries[8].Commit.Sha);
-                Assert.Equal("c10c1d5f74b76f20386d18674bf63fbee6995061", fileHistoryEntries[9].Commit.Sha);
-            }
-        }
+        //        // $ git log --follow --format=oneline untouched.txt
+        //        // c10c1d5f74b76f20386d18674bf63fbee6995061 Initial commit
+        //        fileHistoryEntries = repo.Commits.QueryBy("untouched.txt").ToList();
+        //        Assert.Single(fileHistoryEntries);
+        //        Assert.Equal("c10c1d5f74b76f20386d18674bf63fbee6995061", fileHistoryEntries[0].Commit.Sha);
+
+        //        // $ git log --follow --format=oneline under-test.txt
+        //        // 0b5b18f2feb917dee98df1210315b2b2b23c5bec Rename file renamed.txt into under-test.txt
+        //        // 49921d463420a892c9547a326632ef6a9ba3b225 Update file renamed.txt
+        //        // 70f636e8c64bbc2dfef3735a562bb7e195d8019f Rename file under-test.txt into renamed.txt
+        //        // d3868d57a6aaf2ae6ed4887d805ae4bc91d8ce4d Updated file under test
+        //        // 9da10ef7e139c49604a12caa866aae141f38b861 Updated file under test
+        //        // 599a5d821fb2c0a25855b4233e26d475c2fbeb34 Updated file under test
+        //        // 678b086b44753000567aa64344aa0d8034fa0083 Updated file under test
+        //        // 8f7d9520f306771340a7c79faea019ad18e4fa1f Updated file under test
+        //        // bd5f8ee279924d33be8ccbde82e7f10b9d9ff237 Updated file under test
+        //        // c10c1d5f74b76f20386d18674bf63fbee6995061 Initial commit
+        //        fileHistoryEntries = repo.Commits.QueryBy("under-test.txt").ToList();
+        //        Assert.Equal(10, fileHistoryEntries.Count());
+        //        Assert.Equal("0b5b18f2feb917dee98df1210315b2b2b23c5bec", fileHistoryEntries[0].Commit.Sha);
+        //        Assert.Equal("49921d463420a892c9547a326632ef6a9ba3b225", fileHistoryEntries[1].Commit.Sha);
+        //        Assert.Equal("70f636e8c64bbc2dfef3735a562bb7e195d8019f", fileHistoryEntries[2].Commit.Sha);
+        //        Assert.Equal("d3868d57a6aaf2ae6ed4887d805ae4bc91d8ce4d", fileHistoryEntries[3].Commit.Sha);
+        //        Assert.Equal("9da10ef7e139c49604a12caa866aae141f38b861", fileHistoryEntries[4].Commit.Sha);
+        //        Assert.Equal("599a5d821fb2c0a25855b4233e26d475c2fbeb34", fileHistoryEntries[5].Commit.Sha);
+        //        Assert.Equal("678b086b44753000567aa64344aa0d8034fa0083", fileHistoryEntries[6].Commit.Sha);
+        //        Assert.Equal("8f7d9520f306771340a7c79faea019ad18e4fa1f", fileHistoryEntries[7].Commit.Sha);
+        //        Assert.Equal("bd5f8ee279924d33be8ccbde82e7f10b9d9ff237", fileHistoryEntries[8].Commit.Sha);
+        //        Assert.Equal("c10c1d5f74b76f20386d18674bf63fbee6995061", fileHistoryEntries[9].Commit.Sha);
+        //    }
+        //}
 
         [Theory]
         [InlineData(null)]
@@ -94,11 +96,11 @@ namespace LibGit2Sharp.Tests
                     dummy, master9);
 
                 repo.CreateBranch("master", master10);
-                repo.Checkout("master", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
+                Commands.Checkout(repo, "master", new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
 
                 // Test --date-order.
                 var timeHistory = repo.Commits.QueryBy(path,
-                    new FollowFilter { SortBy = CommitSortStrategies.Time });
+                    new CommitFilter { SortBy = CommitSortStrategies.Time });
                 var timeCommits = new List<Commit>
                 {
                     master10, // master
@@ -117,7 +119,7 @@ namespace LibGit2Sharp.Tests
 
                 // Test --topo-order.
                 var topoHistory = repo.Commits.QueryBy(path,
-                    new FollowFilter { SortBy = CommitSortStrategies.Topological });
+                    new CommitFilter { SortBy = CommitSortStrategies.Topological });
                 var topoCommits = new List<Commit>
                 {
                     master10, // master
@@ -151,8 +153,8 @@ namespace LibGit2Sharp.Tests
                 var commit2 = MakeAndCommitChange(repo, repoPath, path1, "Hello World again");
 
                 // Move the first file to a new directory.
-                var newPath1 = Path.Combine(SubFolderPath1, path1);
-                repo.Move(path1, newPath1);
+                var newPath1 = Path.Combine(SubFolderPath1, path1).Replace(@"\", "/");
+                Commands.Move(repo, path1, newPath1);
                 var commit3 = repo.Commit("Moved " + path1 + " to " + newPath1,
                     Constants.Signature, Constants.Signature);
 
@@ -161,7 +163,8 @@ namespace LibGit2Sharp.Tests
                 var commit4 = MakeAndCommitChange(repo, repoPath, newPath1, "I have done it again!");
 
                 // Perform tests.
-                var fileHistoryEntries = repo.Commits.QueryBy(newPath1).ToList();
+                var commitFilter = new CommitFilter () { SortBy = CommitSortStrategies.Topological };
+                var fileHistoryEntries = repo.Commits.QueryBy(newPath1, commitFilter).ToList();
                 var changedBlobs = fileHistoryEntries.Blobs().Distinct().ToList();
 
                 Assert.Equal(4, fileHistoryEntries.Count());
@@ -222,8 +225,8 @@ namespace LibGit2Sharp.Tests
                 IEnumerable<LogEntry> history = repo.Commits.QueryBy(path).ToList();
                 var changedBlobs = history.Blobs().Distinct();
 
-                Assert.Equal(1, history.Count());
-                Assert.Equal(1, changedBlobs.Count());
+                Assert.Single(history);
+                Assert.Single(changedBlobs);
 
                 Assert.Equal(path, history.First().Path);
                 Assert.Equal(commit, history.First().Commit);
@@ -238,8 +241,8 @@ namespace LibGit2Sharp.Tests
             using (var repo = new Repository(repoPath))
             {
                 IEnumerable<LogEntry> history = repo.Commits.QueryBy("Test.txt").ToList();
-                Assert.Equal(0, history.Count());
-                Assert.Equal(0, history.Blobs().Count());
+                Assert.Empty(history);
+                Assert.Empty(history.Blobs());
             }
         }
 
@@ -255,33 +258,33 @@ namespace LibGit2Sharp.Tests
                 MakeAndCommitChange(repo, repoPath, path, "Hello World");
 
                 Assert.Throws<ArgumentException>(() =>
-                    repo.Commits.QueryBy(path, new FollowFilter
+                    repo.Commits.QueryBy(path, new CommitFilter
                     {
                         SortBy = CommitSortStrategies.None
                     }));
 
                 Assert.Throws<ArgumentException>(() =>
-                    repo.Commits.QueryBy(path, new FollowFilter
+                    repo.Commits.QueryBy(path, new CommitFilter
                     {
                         SortBy = CommitSortStrategies.Reverse
                     }));
 
                 Assert.Throws<ArgumentException>(() =>
-                    repo.Commits.QueryBy(path, new FollowFilter
+                    repo.Commits.QueryBy(path, new CommitFilter
                     {
                         SortBy = CommitSortStrategies.Reverse |
                                  CommitSortStrategies.Topological
                     }));
 
                 Assert.Throws<ArgumentException>(() =>
-                    repo.Commits.QueryBy(path, new FollowFilter
+                    repo.Commits.QueryBy(path, new CommitFilter
                     {
                         SortBy = CommitSortStrategies.Reverse |
                                  CommitSortStrategies.Time
                     }));
 
                 Assert.Throws<ArgumentException>(() =>
-                    repo.Commits.QueryBy(path, new FollowFilter
+                    repo.Commits.QueryBy(path, new CommitFilter
                     {
                         SortBy = CommitSortStrategies.Reverse |
                                  CommitSortStrategies.Topological |
@@ -365,7 +368,7 @@ namespace LibGit2Sharp.Tests
             string message = null)
         {
             Touch(repoPath, path, text);
-            repo.Stage(path);
+            Commands.Stage(repo, path);
 
             var commitSignature = GetNextSignature();
             return repo.Commit(message ?? "Changed " + path, commitSignature, commitSignature);

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using LibGit2Sharp.Core;
-using LibGit2Sharp.Core.Handles;
 
 namespace LibGit2Sharp
 {
@@ -21,14 +19,24 @@ namespace LibGit2Sharp
                 { typeof(Blob), ObjectType.Blob },
                 { typeof(TagAnnotation), ObjectType.Tag },
             };
+        internal static IDictionary<Type, GitObjectType> TypeToGitKindMap =
+            new Dictionary<Type, GitObjectType>
+            {
+                { typeof(Commit), GitObjectType.Commit },
+                { typeof(Tree), GitObjectType.Tree },
+                { typeof(Blob), GitObjectType.Blob },
+                { typeof(TagAnnotation), GitObjectType.Tag },
+            };
 
         private static readonly LambdaEqualityHelper<GitObject> equalityHelper =
             new LambdaEqualityHelper<GitObject>(x => x.Id);
 
+        private readonly ILazy<bool> lazyIsMissing;
+
         /// <summary>
         /// The <see cref="Repository"/> containing the object.
         /// </summary>
-        protected readonly Repository repo;
+        internal readonly Repository repo;
 
         /// <summary>
         /// Needed for mocking purposes.
@@ -45,6 +53,7 @@ namespace LibGit2Sharp
         {
             this.repo = repo;
             Id = id;
+            lazyIsMissing = GitObjectLazyGroup.Singleton(repo, id, handle => handle == null, throwIfMissing: false);
         }
 
         /// <summary>
@@ -53,14 +62,19 @@ namespace LibGit2Sharp
         public virtual ObjectId Id { get; private set; }
 
         /// <summary>
+        ///  Determine if the object is missing
+        /// </summary>
+        /// <remarks>
+        /// This is common when dealing with partially cloned repositories as blobs or trees could be missing
+        /// </remarks>
+        public virtual bool IsMissing => lazyIsMissing.Value;
+
+        /// <summary>
         /// Gets the 40 character sha1 of this object.
         /// </summary>
-        public virtual string Sha
-        {
-            get { return Id.Sha; }
-        }
+        public virtual string Sha => Id.Sha;
 
-        internal static GitObject BuildFrom(Repository repo, ObjectId id, GitObjectType type, FilePath path)
+        internal static GitObject BuildFrom(Repository repo, ObjectId id, GitObjectType type, string path)
         {
             switch (type)
             {
@@ -77,24 +91,41 @@ namespace LibGit2Sharp
                     return new Blob(repo, id);
 
                 default:
-                    throw new LibGit2SharpException(CultureInfo.InvariantCulture,
-                                                    "Unexpected type '{0}' for object '{1}'.",
+                    throw new LibGit2SharpException("Unexpected type '{0}' for object '{1}'.",
                                                     type,
                                                     id);
             }
         }
 
-        internal Commit DereferenceToCommit(bool throwsIfCanNotBeDereferencedToACommit)
+        internal T Peel<T>(bool throwOnError) where T : GitObject
         {
-            using (GitObjectSafeHandle peeledHandle = Proxy.git_object_peel(repo.Handle, Id, GitObjectType.Commit, throwsIfCanNotBeDereferencedToACommit))
+            GitObjectType kind;
+            if (!TypeToGitKindMap.TryGetValue(typeof(T), out kind))
             {
-                if (peeledHandle == null)
+                throw new ArgumentException("Invalid type passed to peel");
+            }
+
+            using (var handle = Proxy.git_object_peel(repo.Handle, Id, kind, throwOnError))
+            {
+                if (handle == null)
                 {
                     return null;
                 }
 
-                return (Commit)BuildFrom(repo, Proxy.git_object_id(peeledHandle), GitObjectType.Commit, null);
+                return (T)BuildFrom(this.repo, Proxy.git_object_id(handle), kind, null);
             }
+        }
+
+        /// <summary>
+        /// Peel this object to the specified type
+        ///
+        /// It will throw if the object cannot be peeled to the type.
+        /// </summary>
+        /// <typeparam name="T">The kind of <see cref="GitObject"/> to peel to.</typeparam>
+        /// <returns>The peeled object</returns>
+        public virtual T Peel<T>() where T : GitObject
+        {
+            return Peel<T>(true);
         }
 
         /// <summary>

@@ -106,7 +106,15 @@ namespace LibGit2Sharp
         /// </value>
         public virtual bool IsCurrentRepositoryHead
         {
-            get { return repo.Head == this; }
+            get
+            {
+                if (this is DetachedHead)
+                {
+                    return repo.Head.Reference.TargetIdentifier == this.Reference.TargetIdentifier;
+                }
+
+                return repo.Head.Reference.TargetIdentifier == this.CanonicalName;
+            }
         }
 
         /// <summary>
@@ -138,7 +146,10 @@ namespace LibGit2Sharp
             {
                 if (IsRemote)
                 {
-                    return Remote.FetchSpecTransformToSource(CanonicalName);
+                    using (var remote = repo.Network.Remotes.RemoteForName(RemoteName))
+                    {
+                        return remote.FetchSpecTransformToSource(CanonicalName);
+                    }
                 }
 
                 return UpstreamBranchCanonicalNameFromLocalBranch();
@@ -146,35 +157,22 @@ namespace LibGit2Sharp
         }
 
         /// <summary>
-        /// Get the remote for the branch.
+        /// Get the name of the remote for the branch.
         /// <para>
         ///   If this is a local branch, this will return the configured
         ///   <see cref="Remote"/> to fetch from and push to. If this is a
-        ///   remote-tracking branch, this will return the remote containing
-        ///   the tracked branch.
+        ///   remote-tracking branch, this will return the name of the remote 
+        ///   containing the tracked branch. If there is no tracking information, 
+        ///   this will return null.
         /// </para>
         /// </summary>
-        public virtual Remote Remote
+        public virtual string RemoteName
         {
             get
             {
-                string remoteName;
-
-                if (IsRemote)
-                {
-                    remoteName = RemoteNameFromRemoteTrackingBranch();
-                }
-                else
-                {
-                    remoteName = RemoteNameFromLocalBranch();
-                }
-
-                if (remoteName == null)
-                {
-                    return null;
-                }
-
-                return repo.Network.Remotes[remoteName];
+                return IsRemote
+                    ? RemoteNameFromRemoteTrackingBranch()
+                    : RemoteNameFromLocalBranch();
             }
         }
 

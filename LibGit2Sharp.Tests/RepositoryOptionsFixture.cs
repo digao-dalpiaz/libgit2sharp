@@ -55,7 +55,7 @@ namespace LibGit2Sharp.Tests
         [Fact]
         public void CanOpenABareRepoWithOptions()
         {
-            var options = new RepositoryOptions { GlobalConfigurationLocation = null };
+            var options = new RepositoryOptions { };
 
             string path = SandboxBareTestRepo();
             using (var repo = new Repository(path, options))
@@ -90,7 +90,7 @@ namespace LibGit2Sharp.Tests
             {
                 Assert.Equal(FileStatus.NewInWorkdir, repo.RetrieveStatus("new_untracked_file.txt"));
 
-                repo.Stage("new_untracked_file.txt");
+                Commands.Stage(repo, "new_untracked_file.txt");
 
                 Assert.Equal(FileStatus.NewInIndex, repo.RetrieveStatus("new_untracked_file.txt"));
 
@@ -148,48 +148,9 @@ namespace LibGit2Sharp.Tests
                 const string filename = "zomg.txt";
                 Touch(sneakyRepo.Info.WorkingDirectory, filename, "I'm being sneaked in!\n");
 
-                sneakyRepo.Stage(filename);
+                Commands.Stage(sneakyRepo, filename);
                 return sneakyRepo.Commit("Tadaaaa!", Constants.Signature, Constants.Signature).Sha;
             }
-        }
-
-        [Fact]
-        public void CanProvideDifferentConfigurationFilesToARepository()
-        {
-            string globalLocation = Path.Combine(newWorkdir, "my-global-config");
-            string xdgLocation = Path.Combine(newWorkdir, "my-xdg-config");
-            string systemLocation = Path.Combine(newWorkdir, "my-system-config");
-
-            const string name = "Adam 'aroben' Roben";
-            const string email = "adam@github.com";
-
-            StringBuilder sb = new StringBuilder()
-                .AppendLine("[user]")
-                .AppendFormat("name = {0}{1}", name, Environment.NewLine)
-                .AppendFormat("email = {0}{1}", email, Environment.NewLine);
-
-            File.WriteAllText(globalLocation, sb.ToString());
-            File.WriteAllText(systemLocation, string.Empty);
-            File.WriteAllText(xdgLocation, string.Empty);
-
-            var options = new RepositoryOptions {
-                GlobalConfigurationLocation = globalLocation,
-                XdgConfigurationLocation = xdgLocation,
-                SystemConfigurationLocation = systemLocation,
-            };
-
-            string path = SandboxBareTestRepo();
-            using (var repo = new Repository(path, options))
-            {
-                Assert.True(repo.Config.HasConfig(ConfigurationLevel.Global));
-                Assert.Equal(name, repo.Config.Get<string>("user.name").Value);
-                Assert.Equal(email, repo.Config.Get<string>("user.email").Value);
-
-                repo.Config.Set("xdg.setting", "https://twitter.com/libgit2sharp", ConfigurationLevel.Xdg);
-                repo.Config.Set("help.link", "https://twitter.com/xpaulbettsx/status/205761932626636800", ConfigurationLevel.System);
-            }
-
-            AssertValueInConfigFile(systemLocation, "xpaulbettsx");
         }
 
         [Fact]
@@ -210,11 +171,11 @@ namespace LibGit2Sharp.Tests
             {
                 const string relativeFilepath = "test.txt";
                 Touch(repo.Info.WorkingDirectory, relativeFilepath, "test\n");
-                repo.Stage(relativeFilepath);
+                Commands.Stage(repo, relativeFilepath);
 
                 Assert.NotNull(repo.Commit("Initial commit", Constants.Signature, Constants.Signature));
-                Assert.Equal(1, repo.Head.Commits.Count());
-                Assert.Equal(1, repo.Commits.Count());
+                Assert.Single(repo.Head.Commits);
+                Assert.Single(repo.Commits);
             }
         }
     }

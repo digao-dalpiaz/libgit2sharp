@@ -8,7 +8,7 @@ namespace LibGit2Sharp
     /// The exception that is thrown when an operation is canceled.
     /// </summary>
     [Serializable]
-    public class UserCancelledException : LibGit2SharpException
+    public class UserCancelledException : NativeException
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="LibGit2Sharp.UserCancelledException"/> class.
@@ -22,6 +22,15 @@ namespace LibGit2Sharp
         /// <param name="message">A message that describes the error.</param>
         public UserCancelledException(string message)
             : base(message)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LibGit2Sharp.UserCancelledException"/> class with a specified error message.
+        /// </summary>
+        /// <param name="format">A composite format string for use in <see cref="String.Format(IFormatProvider, string, object[])"/>.</param>
+        /// <param name="args">An object array that contains zero or more objects to format.</param>
+        public UserCancelledException(string format, params object[] args)
+            : base(format, args)
         { }
 
         /// <summary>
@@ -42,8 +51,16 @@ namespace LibGit2Sharp
             : base(info, context)
         { }
 
-        internal UserCancelledException(string message, GitErrorCode code, GitErrorCategory category)
-            : base(message, code, category)
+        internal UserCancelledException(string message, GitErrorCategory category)
+            : base(message, category)
         { }
+
+        internal override GitErrorCode ErrorCode
+        {
+            get
+            {
+                return GitErrorCode.User;
+            }
+        }
     }
 }

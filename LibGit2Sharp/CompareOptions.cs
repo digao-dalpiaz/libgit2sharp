@@ -14,7 +14,7 @@ namespace LibGit2Sharp
         {
             ContextLines = 3;
             InterhunkLines = 0;
-            Algorithm = DiffAlgorithm.Meyers;
+            Algorithm = DiffAlgorithm.Myers;
         }
 
         /// <summary>
@@ -40,15 +40,15 @@ namespace LibGit2Sharp
         public bool IncludeUnmodified { get; set; }
 
         /// <summary>
-        /// Use the "patience diff" algorithm.
-        /// </summary>
-        [Obsolete("This property will be removed in the next release. Please use Algorithm instead.")]
-        public bool UsePatienceAlgorithm { get; set; }
-
-        /// <summary>
         /// Algorithm to be used when performing a Diff.
-        /// By default, <see cref="DiffAlgorithm.Meyers"/> will be used.
+        /// By default, <see cref="DiffAlgorithm.Myers"/> will be used.
         /// </summary>
         public DiffAlgorithm Algorithm { get; set; }
+
+        /// <summary>
+        /// Enable --indent-heuristic Diff option, that attempts to produce more aesthetically pleasing diffs.
+        /// By default, this option will be false.
+        /// </summary>
+        public bool IndentHeuristic { get; set; }
     }
 }

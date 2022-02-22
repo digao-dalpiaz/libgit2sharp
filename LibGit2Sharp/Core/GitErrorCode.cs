@@ -107,6 +107,16 @@
         Uncommitted = -22,
 
         /// <summary>
+        /// The operation is not valid for a directory.
+        /// </summary>
+        Directory = -23,
+
+        /// <summary>
+        /// A merge conflict exists and cannot continue
+        /// </summary>
+        MergeConflict = -24,
+
+        /// <summary>
         /// Skip and passthrough the given ODB backend.
         /// </summary>
         PassThrough = -30,
@@ -115,5 +125,15 @@
         /// There are no more entries left to iterate.
         /// </summary>
         IterOver = -31,
+
+        /// <summary>
+        /// Internal-only.
+        /// </summary>
+        Retry = -32,
+
+        /// <summary>
+        /// A retrieved object did not match its expected ID.
+        /// </summary>
+        Mismatch = -33,
     }
 }

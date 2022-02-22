@@ -199,7 +199,7 @@ namespace LibGit2Sharp
         {
             Ensure.ArgumentNotNull(branch, "branch");
 
-            using (ReferenceSafeHandle referencePtr = repo.Refs.RetrieveReferencePtr(branch.CanonicalName))
+            using (ReferenceHandle referencePtr = repo.Refs.RetrieveReferencePtr(branch.CanonicalName))
             {
                 Proxy.git_branch_delete(referencePtr);
             }
@@ -263,12 +263,11 @@ namespace LibGit2Sharp
 
             if (branch.IsRemote)
             {
-                throw new LibGit2SharpException(CultureInfo.InvariantCulture,
-                                                "Cannot rename branch '{0}'. It's a remote tracking branch.",
+                throw new LibGit2SharpException("Cannot rename branch '{0}'. It's a remote tracking branch.",
                                                 branch.FriendlyName);
             }
 
-            using (ReferenceSafeHandle referencePtr = repo.Refs.RetrieveReferencePtr(Reference.LocalBranchPrefix + branch.FriendlyName))
+            using (ReferenceHandle referencePtr = repo.Refs.RetrieveReferencePtr(Reference.LocalBranchPrefix + branch.FriendlyName))
             {
                 using (Proxy.git_branch_move(referencePtr, newName, allowOverwrite))
                 { }
