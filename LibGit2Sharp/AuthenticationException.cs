@@ -47,8 +47,8 @@ namespace LibGit2Sharp
         {
         }
 
-        internal AuthenticationException(string message, GitErrorCode code, GitErrorCategory category)
-            : base(message, code, category)
+        internal AuthenticationException(string message, GitErrorCategory category)
+            : base(message, category)
         {
         }
     }
