@@ -20,7 +20,7 @@ namespace LibGit2Sharp
 
         private static string nativeLibraryPath;
         private static bool nativeLibraryPathLocked;
-        private static string nativeLibraryDefaultPath;
+        private static readonly string nativeLibraryDefaultPath = null;
 
         static GlobalSettings()
         {
@@ -29,19 +29,18 @@ namespace LibGit2Sharp
 
             nativeLibraryPathAllowed = netFX || netCore;
 
+#if NETFRAMEWORK
             if (netFX)
             {
                 // For .NET Framework apps the dependencies are deployed to lib/win32/{architecture} directory
                 nativeLibraryDefaultPath = Path.Combine(GetExecutingAssemblyDirectory(), "lib", "win32", Platform.ProcessorArchitecture);
             }
-            else
-            {
-                nativeLibraryDefaultPath = null;
-            }
+#endif
 
             registeredFilters = new Dictionary<Filter, FilterRegistration>();
         }
 
+#if NETFRAMEWORK
         private static string GetExecutingAssemblyDirectory()
         {
             // Assembly.CodeBase is not actually a correctly formatted
@@ -66,6 +65,7 @@ namespace LibGit2Sharp
             managedPath = Path.GetDirectoryName(managedPath);
             return managedPath;
         }
+#endif
 
         /// <summary>
         /// Returns information related to the current LibGit2Sharp
@@ -247,9 +247,9 @@ namespace LibGit2Sharp
             Ensure.ArgumentNotNull(filter, "filter");
             if (priority < FilterRegistration.FilterPriorityMin || priority > FilterRegistration.FilterPriorityMax)
             {
-                throw new ArgumentOutOfRangeException("priority",
+                throw new ArgumentOutOfRangeException(nameof(priority),
                                                       priority,
-                                                      String.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                                      string.Format(System.Globalization.CultureInfo.InvariantCulture,
                                                                     "Filter priorities must be within the inclusive range of [{0}, {1}].",
                                                                     FilterRegistration.FilterPriorityMin,
                                                                     FilterRegistration.FilterPriorityMax));
@@ -416,6 +416,27 @@ namespace LibGit2Sharp
         public static string GetUserAgent()
         {
             return Proxy.git_libgit2_opts_get_user_agent();
+        }
+
+        /// <summary>
+        /// Gets the owner validation setting for repository directories.
+        /// </summary>
+        /// <returns></returns>
+        public static bool GetOwnerValidation()
+        {
+            return Proxy.git_libgit2_opts_get_owner_validation();
+        }
+
+        /// <summary>
+        ///  Sets whether repository directories should be owned by the current user. The default is to validate ownership.
+        /// </summary>
+        /// <remarks>
+        ///  Disabling owner validation can lead to security vulnerabilities (see CVE-2022-24765).
+        /// </remarks>
+        /// <param name="enabled">true to enable owner validation; otherwise, false.</param>
+        public static void SetOwnerValidation(bool enabled)
+        {
+            Proxy.git_libgit2_opts_set_owner_validation(enabled);
         }
     }
 }

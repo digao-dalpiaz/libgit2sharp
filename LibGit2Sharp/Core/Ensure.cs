@@ -49,7 +49,7 @@ namespace LibGit2Sharp.Core
         {
             ArgumentNotNull(argumentValue, argumentName);
 
-            if (String.IsNullOrWhiteSpace (argumentValue))
+            if (string.IsNullOrWhiteSpace(argumentValue))
             {
                 throw new ArgumentException("String cannot be empty", argumentName);
             }
@@ -257,7 +257,7 @@ namespace LibGit2Sharp.Core
             }
 
             var messageFormat = "No valid git object identified by '{0}' exists in the repository.";
-                                        
+
             if (string.Equals("HEAD", identifier, StringComparison.Ordinal))
             {
                 throw new UnbornBranchException(messageFormat, identifier);

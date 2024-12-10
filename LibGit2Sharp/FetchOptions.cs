@@ -27,15 +27,23 @@
         public bool? Prune { get; set; }
 
         /// <summary>
+        /// Specifies the depth of the fetch to perform.
+        /// <para>
+        /// Default value is 0 (full fetch).
+        /// </para>
+        /// </summary>
+        public int Depth { get; set; } = 0;
+
+        /// <summary>
         /// Get/Set the custom headers.
-        /// 
-        /// <para> 
-        /// This allows you to set custom headers (e.g. X-Forwarded-For, 
+        ///
+        /// <para>
+        /// This allows you to set custom headers (e.g. X-Forwarded-For,
         /// X-Request-Id, etc),
         /// </para>
         /// </summary>
         /// <remarks>
-        /// Libgit2 sets some headers for HTTP requests (User-Agent, Host, 
+        /// Libgit2 sets some headers for HTTP requests (User-Agent, Host,
         /// Accept, Content-Type, Transfer-Encoding, Content-Length, Accept) that
         /// cannot be overriden.
         /// </remarks>

@@ -73,7 +73,9 @@ namespace LibGit2Sharp
                 var certPtr = sshCert.ToPointer();
                 ret = NativeMethods.git_transport_smart_certificate_check(Transport, certPtr, valid ? 1 : 0, hostname);
                 Marshal.FreeHGlobal(certPtr);
-            } else {
+            }
+            else
+            {
                 IntPtr certPtr, dataPtr;
                 certPtr = x509Cert.ToPointers(out dataPtr);
                 ret = NativeMethods.git_transport_smart_certificate_check(Transport, certPtr, valid ? 1 : 0, hostname);
@@ -131,11 +133,11 @@ namespace LibGit2Sharp
 
             unsafe
             {
-                var baseCred = (GitCredential*) credHandle;
+                var baseCred = (GitCredential*)credHandle;
                 switch (baseCred->credtype)
                 {
                     case GitCredentialType.UserPassPlaintext:
-                        cred = UsernamePasswordCredentials.FromNative((GitCredentialUserpass*) credHandle);
+                        cred = UsernamePasswordCredentials.FromNative((GitCredentialUserpass*)credHandle);
                         return 0;
                     case GitCredentialType.Default:
                         cred = new DefaultCredentials();
@@ -158,7 +160,7 @@ namespace LibGit2Sharp
         /// <param name="url">The endpoint to connect to</param>
         /// <param name="action">The type of connection to create</param>
         /// <returns>A SmartSubtransportStream representing the connection</returns>
-        protected abstract SmartSubtransportStream Action(String url, GitSmartSubtransportAction action);
+        protected abstract SmartSubtransportStream Action(string url, GitSmartSubtransportAction action);
 
         /// <summary>
         /// Invoked by libgit2 when this subtransport is no longer needed, but may be re-used in the future.
@@ -225,7 +227,7 @@ namespace LibGit2Sharp
                 stream = IntPtr.Zero;
 
                 SmartSubtransport t = GCHandle.FromIntPtr(Marshal.ReadIntPtr(subtransport, GitSmartSubtransport.GCHandleOffset)).Target as SmartSubtransport;
-                String urlAsString = LaxUtf8Marshaler.FromNative(url);
+                string urlAsString = LaxUtf8Marshaler.FromNative(url);
 
                 if (t == null)
                 {
@@ -233,12 +235,12 @@ namespace LibGit2Sharp
                     return (int)GitErrorCode.Error;
                 }
 
-                if (String.IsNullOrEmpty(urlAsString))
+                if (string.IsNullOrEmpty(urlAsString))
                 {
                     urlAsString = t.LastActionUrl;
                 }
 
-                if (String.IsNullOrEmpty(urlAsString))
+                if (string.IsNullOrEmpty(urlAsString))
                 {
                     Proxy.git_error_set_str(GitErrorCategory.Net, "no url provided");
                     return (int)GitErrorCode.Error;
